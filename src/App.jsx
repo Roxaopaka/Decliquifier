@@ -2135,7 +2135,7 @@ function SettingsTab({cls,upd}) {
     <SettingsSlider value={s[f]??Math.round((min+max)/2)} onChange={v=>set(f,v)} min={min} max={max} step={step}/>
   );//s
   const Sec=({t})=><div style={{fontSize:10,letterSpacing:2,color:T.muted,marginTop:24,marginBottom:2}}>{t}</div>;
-  return (
+  return (//s
     <div style={{maxWidth:680}}>
       <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,marginBottom:4,color:T.dark}}>Randomization Settings</div>
       <p style={{color:T.muted,fontSize:13,marginBottom:24,lineHeight:1.6}}>Higher weights enforce constraints more strongly relative to chemistry scores.</p>
