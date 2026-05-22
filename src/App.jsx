@@ -64,6 +64,7 @@ const safeStorage = {
     return { key, value };
   },
 };
+const VERSION_POLL_MS = 60000;
 
 // Chemistry line colour: 0=red, 50=yellow, 100=green
 const chemCol = v => {
@@ -407,6 +408,20 @@ const GBtn  = ({onClick,children,style={}}) => {
     {children}
   </button>;
 };
+function UpdateAvailableBanner() {
+  const T=useT();
+  return (
+    <div style={{position:"fixed",right:18,bottom:18,zIndex:2000,background:T.panel,
+      border:`1px solid ${T.accent}`,borderRadius:10,boxShadow:"0 10px 30px rgba(0,0,0,.25)",
+      padding:"14px 16px",display:"flex",gap:14,alignItems:"center",flexWrap:"wrap",maxWidth:360}}>
+      <div>
+        <div style={{fontSize:14,fontWeight:700,color:T.dark}}>Update Available: Refresh to update</div>
+        <div style={{fontSize:12,color:T.muted}}>A newer SeatCraft version has been published.</div>
+      </div>
+      <ABtn onClick={()=>window.location.reload()} style={{padding:"8px 14px"}}>Refresh</ABtn>
+    </div>
+  );
+}
 
 // ─── tutorial ─────────────────────────────────────────────────────────────────
 const STEPS = [
@@ -553,12 +568,31 @@ export default function App() {
   const [showTut,setShowTut]     = useState(false);
   const [addingCls,setAddingCls] = useState(false);
   const [newCls,setNewCls]       = useState("");
+  const [updateAvailable,setUpdateAvailable] = useState(false);
   const clsRef = useRef();
+  const versionRef = useRef(null);
 
   useEffect(()=>{(async()=>{
     try{const s=await safeStorage.get("sc-session");if(s)setTeacher(JSON.parse(s.value));}catch{}
     setAuthReady(true);
   })();},[]);
+
+  useEffect(()=>{
+    let stopped=false;
+    const check=async()=>{
+      try{
+        const r=await fetch(`/app-version.json?ts=${Date.now()}`,{cache:"no-store"});
+        if(!r.ok)return;
+        const data=await r.json();
+        if(!data?.buildId)return;
+        if(versionRef.current&&versionRef.current!==data.buildId&&!stopped)setUpdateAvailable(true);
+        versionRef.current=data.buildId;
+      }catch{}
+    };
+    check();
+    const id=window.setInterval(check,VERSION_POLL_MS);
+    return()=>{stopped=true;window.clearInterval(id);};
+  },[]);
 
   useEffect(()=>{
     if(!teacher){setClasses({});setActive(null);setDataReady(false);return;}
@@ -613,6 +647,7 @@ export default function App() {
   return (
     <ThemeCtx.Provider value={T}>
       <style>{mkStyles(T)}</style>
+      {updateAvailable&&<UpdateAvailableBanner/>}
       {showTut&&<TutorialModal onDone={dismissTut}/>}
       <div className="app-shell">
         {/* Sidebar */}
@@ -1761,6 +1796,82 @@ function ChemistryTab({cls,upd}) {
   );
 }
 
+function PresenterView({cls,layout,result,studentMeta,allGrades,locked,onClose}) {
+  const T=useT();
+  const [size,setSize]=useState(()=>({w:window.innerWidth,h:window.innerHeight}));
+  useEffect(()=>{
+    const onResize=()=>setSize({w:window.innerWidth,h:window.innerHeight});
+    window.addEventListener("resize",onResize);
+    return()=>window.removeEventListener("resize",onResize);
+  },[]);
+  useEffect(()=>{
+    const onKey=e=>{if(e.key==="Escape")onClose();};
+    window.addEventListener("keydown",onKey);
+    return()=>window.removeEventListener("keydown",onKey);
+  },[onClose]);
+  const scale=Math.min((size.w*.92)/CW,(size.h*.74)/CH,1.7);
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1500,background:T.isDark?"#0F1018":"#F7F3DF",
+      color:T.dark,display:"flex",flexDirection:"column",alignItems:"center",padding:"28px 28px 22px"}}>
+      <div style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,marginBottom:18}}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:34,lineHeight:1,color:T.dark}}>{cls.name}</div>
+          <div style={{fontSize:12,letterSpacing:2,color:T.muted,marginTop:8,textTransform:"uppercase"}}>
+            {layout.name} seating chart
+          </div>
+        </div>
+        <button onClick={onClose}
+          style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 16px",
+            color:T.dark,fontSize:13,boxShadow:"0 2px 10px rgba(0,0,0,.12)"}}>
+          Exit Presenter
+        </button>
+      </div>
+
+      <div style={{width:CW*scale,height:CH*scale,position:"relative",flexShrink:0}}>
+        <div style={{position:"absolute",left:0,top:0,width:CW,height:CH,transform:`scale(${scale})`,
+          transformOrigin:"top left",border:`2px solid ${T.border}`,borderRadius:12,boxShadow:"0 16px 40px rgba(0,0,0,.18)",
+          overflow:"hidden",background:T.canvas}}>
+          <div style={{position:"absolute",inset:0,background:T.canvas,borderRadius:10,
+            backgroundImage:"radial-gradient(circle,#D5CAB455 1px,transparent 1px)",
+            backgroundSize:`${GRID_SZ}px ${GRID_SZ}px`,
+            clipPath:polyToClip(layout.roomPoly??DEFAULT_ROOM()),overflow:"hidden",pointerEvents:"none"}}>
+            <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",
+              background:"#222",color:"#F7F3EC",fontSize:9,padding:"3px 20px",borderRadius:3,letterSpacing:2,opacity:.45}}>
+              BOARD
+            </div>
+          </div>
+          <div style={{position:"absolute",inset:0,clipPath:polyToClip(layout.roomPoly??DEFAULT_ROOM())}}>
+            {layout.seats.map(seat=>{
+              const assigned=assignedStudentsFor(result,seat.id);
+              const isLocked=assigned.some(stu=>locked.has(stu));
+              return (
+                <DeskBody key={seat.id} seat={seat} theme={T} isLocked={isLocked}
+                  isSelected={false} isHovered={false}
+                  students={assigned} meta={assigned.map(stu=>studentMeta[stu]??{})} allGrades={allGrades}
+                  readonly={true} onHov={()=>{}} onCtx={()=>{}}/>
+              );
+            })}
+          </div>
+          <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none"}}>
+            <polygon points={(layout.roomPoly??DEFAULT_ROOM()).map(p=>`${p.x},${p.y}`).join(" ")}
+              fill="none" stroke="rgba(128,128,128,.25)" strokeWidth={1.5} strokeDasharray="6 5"/>
+          </svg>
+        </div>
+      </div>
+
+      <div style={{marginTop:18,display:"flex",gap:12,alignItems:"center",justifyContent:"center",flexWrap:"wrap"}}>
+        <span style={{fontSize:12,letterSpacing:2,color:T.muted}}>GRADE</span>
+        {allGrades.map(g=>(
+          <span key={g} style={{background:gradeColor(g,allGrades,T),color:gradeTextColor(g),
+            fontSize:13,padding:"5px 12px",borderRadius:999,fontWeight:700,boxShadow:"0 2px 8px rgba(0,0,0,.14)"}}>
+            {g}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── randomize tab ────────────────────────────────────────────────────────────
 function RandomizeTab({cls}) {
   const T=useT();
@@ -1772,6 +1883,7 @@ function RandomizeTab({cls}) {
   const [hov,setHov]=useState(null);
   const [swapping,setSwapping]=useState(null); // seatId being moved
   const [locked,setLocked]=useState(()=>new Set());
+  const [presenting,setPresenting]=useState(false);
 
   const layout=lid?cls.layouts[lid]:null;
   const seats=layout?.seats||[];
@@ -1814,12 +1926,24 @@ function RandomizeTab({cls}) {
     else if(swapping===sid){setSwapping(null);}
     else{setResult(r=>({...r,[sid]:r[swapping],[swapping]:r[sid]}));setSwapping(null);}
   };
+  const openPresenter=()=>{
+    setPresenting(true);
+    document.documentElement.requestFullscreen?.().catch(()=>{});
+  };
+  const closePresenter=()=>{
+    setPresenting(false);
+    if(document.fullscreenElement)document.exitFullscreen?.().catch(()=>{});
+  };
 
   const canRun=layout&&students.length>0&&seatSlots.length>0&&!running;
   const active=[settings.separateGenders&&`Gender (w=${settings.genderWeight})`,settings.mixGrades&&`Grade mix (w=${settings.gradeWeight})`].filter(Boolean);
 
   return (
     <div>
+      {presenting&&layout&&result&&(
+        <PresenterView cls={cls} layout={layout} result={result} studentMeta={studentMeta}
+          allGrades={allGrades} locked={validLocked} onClose={closePresenter}/>
+      )}
       <div style={{display:"flex",gap:20,alignItems:"flex-end",marginBottom:18,flexWrap:"wrap"}}>
         <div>
           <div style={{fontSize:9,letterSpacing:2,opacity:.35,marginBottom:7,color:T.dark}}>LAYOUT</div>
@@ -1834,6 +1958,7 @@ function RandomizeTab({cls}) {
           <div style={{fontSize:11,color:T.muted}}>Capacity {totalCapacity} seat{totalCapacity!==1?"s":""} · adjust in Layout</div>
         </div>
         <ABtn onClick={run} disabled={!canRun}>{running?"Optimizing…":"⚡ Randomize"}</ABtn>
+        {result&&<ABtn onClick={openPresenter} style={{background:T.sel}}>Present</ABtn>}
         {result&&<GBtn onClick={()=>{setResult(null);setSwapping(null);}}>Clear</GBtn>}
         {validLocked.size>0&&<GBtn onClick={()=>setLocked(new Set())}>Unlock all</GBtn>}
       </div>
@@ -2102,6 +2227,7 @@ function ControlsTab() {
 
       <Sec title="RANDOMIZE (Randomize tab)">
         <KRow keys={["Randomize"]} desc="Run SA optimizer to assign all students to seats"/>
+        <KRow keys={["Present"]} desc="Open a fullscreen seating chart for screen sharing or classroom display"/>
         <KRow keys={["Lock chips","Desk lock"]} desc="Keep selected students in their current seats on the next randomize"/>
         <KRow keys={["Click two desks"]} desc="After randomizing, click two seats to swap their students"/>
         <KRow keys={["Clear"]} desc="Clear the randomized result and start over"/>
