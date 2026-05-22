@@ -2133,7 +2133,7 @@ function SettingsTab({cls,upd}) {
   // do NOT inline it here; see comment above SettingsSlider for why.
   const Slider=({f,min,max,step})=>(
     <SettingsSlider value={s[f]??Math.round((min+max)/2)} onChange={v=>set(f,v)} min={min} max={max} step={step}/>
-  );
+  );//s
   const Sec=({t})=><div style={{fontSize:10,letterSpacing:2,color:T.muted,marginTop:24,marginBottom:2}}>{t}</div>;
   return (
     <div style={{maxWidth:680}}>
