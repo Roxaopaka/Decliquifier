@@ -298,7 +298,14 @@ const ThemeCtx = createContext(LIGHT);
 const useT = () => useContext(ThemeCtx);
 
 const genderColor = (g,T) => ({M:T.gMale,F:T.gFemale,X:T.gOther}[g]??T.muted);
-const gradeColor  = (g,all,T) => T.grades[all.indexOf(g)%T.grades.length]??"#aaa";
+const FIXED_GRADE_COLORS = {
+  "9":"#D95A5A",
+  "10":"#E88AB8",
+  "11":"#8FC8F2",
+  "12":"#5BA85A",
+};
+const gradeColor  = (g,all,T) => FIXED_GRADE_COLORS[g] ?? T.grades[all.indexOf(g)%T.grades.length] ?? "#aaa";
+const gradeTextColor = g => g==="11" ? "#17324D" : "#fff";
 
 // ─── global styles ────────────────────────────────────────────────────────────
 const mkStyles = T => `
@@ -818,7 +825,10 @@ function LayoutTab({cls,upd}) {
   // Keyboard shortcuts
   useEffect(()=>{
     const h=e=>{
-      if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT")return;
+      const tag=e.target.tagName;
+      const type=e.target.type;
+      const isTextEntry=tag==="TEXTAREA"||tag==="SELECT"||(tag==="INPUT"&&!["checkbox","radio","range","button"].includes(type));
+      if(isTextEntry)return;
       const m=e.ctrlKey||e.metaKey;
       if(m&&e.key==="z"&&!e.shiftKey){e.preventDefault();undo();}
       if(m&&(e.key==="y"||(e.key==="z"&&e.shiftKey))){e.preventDefault();redo();}
@@ -1284,7 +1294,6 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
   const strokeColor = isSelected ? T.sel : isHovered ? T.accent : isLocked ? T.accent : filled ? (T.isDark?"#777":"#333") : T.border;
   const fillColor   = filled ? (T.isDark?"#3A3A5A":"#2C2416") : isSelected ? T.selLt : T.canvas;
   const gc  = primaryMeta?.gender ? genderColor(primaryMeta.gender, T) : null;
-  const grc = primaryMeta?.grade  ? gradeColor(primaryMeta.grade, allGrades, T) : null;
 
   // ── Layer 1: Wrapper — positioned, axis-aligned, owns mouse events ───────
   const wrapStyle = {
@@ -1313,15 +1322,23 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
     <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
       justifyContent:"center",pointerEvents:"none",zIndex:2}}>
       {filled ? (
-        <span style={{fontFamily:"'DM Sans',sans-serif",
+        <span style={{fontFamily:"'DM Sans',sans-serif",display:"flex",flexDirection:"column",
+          alignItems:"center",justifyContent:"center",gap:2,
           fontSize: Math.max(5, (assignedStudents.length>1?6.8:8.5) * Math.min(sc, 1.8)),
           fontWeight:500, color:"#fff", textAlign:"center",
           padding:"0 3px", lineHeight:1.2, maxHeight:"100%", overflow:"hidden"}}>
-          {assignedStudents.map((name,i) => (
-            <span key={`${name}-${i}`} style={{display:"block",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:W-6}}>
-              {name}
-            </span>
-          ))}
+          {assignedStudents.map((name,i) => {
+            const m = Array.isArray(meta) ? (meta[i] ?? {}) : primaryMeta;
+            const bg = m.grade ? gradeColor(m.grade, allGrades, T) : "transparent";
+            return (
+              <span key={`${name}-${i}`} style={{display:"block",whiteSpace:"nowrap",overflow:"hidden",
+                textOverflow:"ellipsis",maxWidth:W-8,borderRadius:999,padding:m.grade?"2px 6px":"0 2px",
+                background:bg,color:m.grade?gradeTextColor(m.grade):"#fff",
+                boxShadow:m.grade?"0 1px 3px rgba(0,0,0,.18)":"none"}}>
+                {name}
+              </span>
+            );
+          })}
         </span>
       ) : (
         <span style={{fontFamily:"'DM Mono',monospace",
@@ -1345,12 +1362,6 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
         boxShadow:"0 2px 8px rgba(0,0,0,.2)"}}>🔒</div>}
       {gc && <div style={{position:"absolute",top:4,right:4,width:7,height:7,
         borderRadius:"50%",background:gc,zIndex:3,pointerEvents:"none"}}/>}
-      {grc && primaryMeta.grade && <div style={{position:"absolute",bottom:3,left:"50%",
-        transform:"translateX(-50%)",background:grc,color:"#fff",
-        fontSize:Math.max(5,6*Math.min(sc,1.8)),padding:"1px 4px",
-        borderRadius:3,fontWeight:700,zIndex:3,pointerEvents:"none",whiteSpace:"nowrap"}}>
-        {primaryMeta.grade}
-      </div>}
     </>
   );
   // Capacity pill: compact +/- controls are attached to the desk itself because
