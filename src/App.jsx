@@ -247,30 +247,18 @@ function runLockedSA(students,seats,currentResult,lockedStudents,chem,r,studentM
 
 // ─── THEME CONTEXT ────────────────────────────────────────────────────────────
 const LIGHT = {
-  // Page background: the warm yellow classroom-paper color that frames the app.
-  bg:"#FFF0A0",
-  // Sidebar is intentionally near-black so the class list reads like stable app chrome.
-  sidebar:"#111",
-  // Canvas is a softer off-white so desks contrast without a harsh white field.
+  bg:"#FF705D",
+  sidebar:"#000",
   canvas:"#FFFFF5",
-  // Panels/cards use pure white in light mode for form fields, modals, and tool surfaces.
-  panel:"#FFFFFF",
-  // Primary text color; named "dark" because many inline styles use it as foreground.
-  dark:"#1A1A1A",
-  // Accent drives primary buttons, selected room tools, imports, and active controls.
-  accent:"#C45C2E",
-  // Light accent fill for selected tabs, warnings, and subtle button backgrounds.
-  accentLt:"#FFF5F0",
-  // Border color used across boxes, inputs, canvas outlines, and segmented controls.
-  border:"#E5DCCC",
-  // Muted text color for helper copy, counters, placeholder-like labels, and inactive tabs.
-  muted:"#999",
-  // Chip fill for saved student pills; warmer than panels but quieter than the accent.
-  chip:"#FFF3C4",
-  // Selection blue is deliberately different from the orange action accent so desk selection
-  // is visually distinct from "do this" controls.
-  sel:"#3B82F6",
-  selLt:"rgba(59,130,246,.12)",
+  panel:"rgba(255,255,255,.88)",
+  dark:"#000",
+  accent:"#000",
+  accentLt:"rgba(255,255,255,.55)",
+  border:"#000",
+  muted:"#000",
+  chip:"rgba(255,255,255,.82)",
+  sel:"#000",
+  selLt:"rgba(0,0,0,.12)",
   // Metadata colors are high-contrast badges used inside desk labels and saved student chips.
   gMale:"#4A90D9",gFemale:"#D94A8C",gOther:"#7A6EBA",
   // Grade colors cycle if more labels are ever added; grades 6-12 fit in the first seven.
@@ -279,18 +267,18 @@ const LIGHT = {
 };
 const DARK = {
   // Dark mode mirrors each light token rather than inventing separate component styles.
-  bg:"#16161E",
-  sidebar:"#0A0A12",
-  canvas:"#1E1E2C",
-  panel:"#252535",
-  dark:"#E0E0F0",
-  accent:"#E07856",
-  accentLt:"#3A2218",
-  border:"#333355",
-  muted:"#6666AA",
-  chip:"#2A2A44",
-  sel:"#6BA5FF",
-  selLt:"rgba(107,165,255,.15)",
+  bg:"#000",
+  sidebar:"#000",
+  canvas:"#111",
+  panel:"#111",
+  dark:"#fff",
+  accent:"#fff",
+  accentLt:"#222",
+  border:"#fff",
+  muted:"#fff",
+  chip:"#111",
+  sel:"#fff",
+  selLt:"rgba(255,255,255,.15)",
   gMale:"#5AA0E8",gFemale:"#E06AAD",gOther:"#9A8AD4",
   grades:["#7AC87A","#E4A26A","#86BFE4","#D87AD8","#E4C46A","#7ADAD8","#C87A7A","#AACB7B"],
   isDark:true,
@@ -310,21 +298,34 @@ const gradeTextColor = g => g==="11" ? "#17324D" : "#fff";
 
 // ─── global styles ────────────────────────────────────────────────────────────
 const mkStyles = T => `
-  /* Typography: Playfair is reserved for SeatCraft/title moments; DM Sans keeps
-     dense tools readable; DM Mono is used only where numbers/keyboard labels
-     benefit from equal-width characters. */
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600&display=swap');
   /* Global reset keeps inline component boxes predictable because this app uses
      many hand-sized controls instead of a separate CSS component library. */
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{background:${T.bg};font-family:'DM Sans',sans-serif}
+  *{font-family:'Barlow Condensed',sans-serif!important;letter-spacing:0!important}
+  html,body,#root{min-height:100%;width:100%}
+  body{
+    background:${T.bg};
+    background-image:
+      radial-gradient(circle at 9% 70%, rgba(255,255,255,.88) 0 18%, rgba(255,255,255,0) 39%),
+      radial-gradient(circle at 45% 67%, rgba(255,244,121,.9) 0 13%, rgba(255,244,121,0) 44%),
+      radial-gradient(circle at 74% 16%, rgba(255,54,74,.84) 0 12%, rgba(255,54,74,0) 54%),
+      linear-gradient(135deg,#fff4d8 0%,#ffd46f 38%,#ff765d 68%,#f63d50 100%);
+    font-family:'Barlow Condensed',sans-serif;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.22;mix-blend-mode:multiply;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+  }
+  #root{position:relative;z-index:1}
   /* Thin scrollbars help long student/class lists stay compact and tool-like. */
   ::-webkit-scrollbar{width:4px;height:4px}
   ::-webkit-scrollbar-thumb{background:${T.muted};border-radius:2px}
   /* Form and button defaults inherit the app font so native controls do not
      visually drift from the custom inline-styled controls. */
-  button{cursor:pointer;font-family:'DM Sans',sans-serif}
-  input,select,textarea{font-family:'DM Sans',sans-serif}
+  button{cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:500}
+  input,select,textarea{font-family:'Barlow Condensed',sans-serif}
   /* Range and checkbox controls borrow the current theme accent, which makes
      sliders, toggles, and randomized chemistry controls feel connected. */
   input[type=range]{accent-color:${T.accent};cursor:pointer;width:100%}
@@ -344,12 +345,12 @@ const mkStyles = T => `
   .ctx-item:hover{background:${T.bg}!important}
   .preset-btn:hover{background:${T.accentLt}!important;border-color:${T.accent}!important;color:${T.accent}!important}
   .shape-btn:hover{opacity:1!important}
-  .app-shell{display:flex;height:100vh;background:${T.bg};color:${T.dark}}
-  .app-sidebar{width:210px;background:${T.sidebar};color:#ddd;display:flex;flex-direction:column;padding:28px 14px 18px;flex-shrink:0}
+  .app-shell{display:flex;height:100vh;background:transparent;color:${T.dark}}
+  .app-sidebar{width:210px;background:${T.sidebar};color:#fff;display:flex;flex-direction:column;padding:28px 14px 18px;flex-shrink:0}
   .app-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
   .class-header{padding:22px 28px 0;border-bottom:1px solid ${T.border};flex-shrink:0}
   .tab-strip{display:flex;gap:2px;overflow-x:auto}
-  .class-content{flex:1;overflow:auto;padding:24px 28px;background:${T.bg}}
+  .class-content{flex:1;overflow:auto;padding:24px 28px;background:transparent}
   .layout-shell{display:flex;gap:20px;flex-wrap:wrap}
   .layout-rail{width:160px;flex-shrink:0}
   .canvas-column{flex:1;min-width:0}
@@ -415,7 +416,7 @@ function UpdateAvailableBanner() {
       border:`1px solid ${T.accent}`,borderRadius:10,boxShadow:"0 10px 30px rgba(0,0,0,.25)",
       padding:"14px 16px",display:"flex",gap:14,alignItems:"center",flexWrap:"wrap",maxWidth:360}}>
       <div>
-        <div style={{fontSize:14,fontWeight:700,color:T.dark}}>Update Available: Refresh to update</div>
+        <div style={{fontSize:14,fontWeight:600,color:T.dark}}>Update Available: Refresh to update</div>
         <div style={{fontSize:12,color:T.muted}}>A newer SeatCraft version has been published.</div>
       </div>
       <ABtn onClick={()=>window.location.reload()} style={{padding:"8px 14px"}}>Refresh</ABtn>
@@ -441,7 +442,7 @@ function TutorialModal({onDone}) {
       <div className="tut-card" style={{background:T.panel,borderRadius:16,padding:"36px 32px",width:380,
         boxShadow:"0 16px 48px rgba(0,0,0,.25)",textAlign:"center"}}>
         <div style={{fontSize:46,marginBottom:12}}>🪑</div>
-        <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:T.dark,marginBottom:10}}>Welcome to SeatCraft</div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,color:T.dark,marginBottom:10}}>Welcome to SeatCraft</div>
         <p style={{fontSize:13,color:T.muted,lineHeight:1.7,marginBottom:26}}>First time here? Would you like a quick tour?</p>
         <div style={{display:"flex",gap:10}}>
           <ABtn onClick={()=>setStep(0)}>Yes, show me around</ABtn>
@@ -460,7 +461,7 @@ function TutorialModal({onDone}) {
             background:i===step?T.accent:T.border,transition:"background .2s"}}/>)}
         </div>
         <div style={{fontSize:38,textAlign:"center",marginBottom:12}}>{s.icon}</div>
-        <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,textAlign:"center",color:T.dark,marginBottom:10}}>{s.title}</div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,textAlign:"center",color:T.dark,marginBottom:10}}>{s.title}</div>
         <p style={{fontSize:13,color:T.muted,textAlign:"center",lineHeight:1.7,marginBottom:24}}>{s.text}</p>
         <div style={{display:"flex",gap:10,justifyContent:"center"}}>
           {step>0&&<GBtn onClick={()=>setStep(s=>s-1)}>← Back</GBtn>}
@@ -527,7 +528,7 @@ function LoginPage({onLogin}) {
       <div className="login-card" style={{width:360,background:T.panel,borderRadius:16,
         border:`1px solid ${T.border}`,padding:"40px 36px",boxShadow:"0 8px 32px rgba(0,0,0,.1)"}}>
         <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:300,color:T.dark,marginBottom:4}}>SeatCraft</div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,color:T.dark,marginBottom:4}}>SeatCraft</div>
           <div style={{fontSize:10,letterSpacing:3,color:T.muted}}>CLASSROOM SEATING</div>
         </div>
         <div style={{display:"flex",background:T.bg,borderRadius:8,padding:3,marginBottom:26}}>
@@ -652,9 +653,9 @@ export default function App() {
       <div className="app-shell">
         {/* Sidebar */}
         <aside className="app-sidebar">
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:21,marginBottom:2}}>SeatCraft</div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:21,marginBottom:2}}>SeatCraft</div>
           <div style={{fontSize:9,letterSpacing:2,opacity:.3,marginBottom:8}}>CLASSROOM SEATING</div>
-          <div style={{fontSize:10,color:"rgba(255,255,255,.35)",marginBottom:18,overflow:"hidden",
+          <div style={{fontSize:10,color:"#fff",marginBottom:18,overflow:"hidden",
             textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={teacher}>{teacher}</div>
           <div style={{fontSize:9,letterSpacing:2,opacity:.3,marginBottom:10}}>CLASSES</div>
           <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
@@ -666,7 +667,7 @@ export default function App() {
                 <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{c.name}</span>
                 <span style={{fontSize:9,opacity:.4,marginRight:4}}>{c.students.length}</span>
                 <button onClick={e=>{e.stopPropagation();delCls(c.id);}}
-                  style={{background:"none",border:"none",color:"rgba(255,255,255,.4)",fontSize:17,padding:"0 0 0 4px",lineHeight:1}}>×</button>
+                  style={{background:"none",border:"none",color:"#fff",fontSize:17,padding:"0 0 0 4px",lineHeight:1}}>×</button>
               </div>
             ))}
             {!Object.keys(classes).length&&<div style={{fontSize:12,opacity:.25,padding:"6px 10px"}}>No classes yet</div>}
@@ -677,26 +678,26 @@ export default function App() {
                 onKeyDown={e=>{if(e.key==="Enter")addCls();if(e.key==="Escape"){setAddingCls(false);setNewCls("");}}}
                 placeholder="Class name…"
                 style={{flex:1,background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.25)",
-                  borderRadius:6,padding:"7px 10px",fontSize:12,color:"#F0F0F0",outline:"none"}}/>
+                  borderRadius:6,padding:"7px 10px",fontSize:12,color:"#fff",outline:"none"}}/>
               <button onClick={addCls} style={{background:"#C45C2E",border:"none",color:"#fff",borderRadius:6,padding:"7px 10px",fontSize:12}}>✓</button>
             </div>
           ):(
             <button onClick={()=>setAddingCls(true)}
               style={{background:"rgba(255,255,255,.07)",border:"1px dashed rgba(255,255,255,.2)",
-                color:"rgba(255,255,255,.6)",padding:"9px 12px",borderRadius:6,fontSize:12,marginTop:10}}>+ New class</button>
+                color:"#fff",padding:"9px 12px",borderRadius:6,fontSize:12,marginTop:10}}>+ New class</button>
           )}
           <div style={{marginTop:10,display:"flex",gap:5}}>
             <button onClick={()=>setDark(d=>!d)} title="Toggle dark mode"
               style={{flex:1,background:"none",border:"1px solid rgba(255,255,255,.1)",
-                color:"rgba(255,255,255,.4)",borderRadius:6,padding:"6px 0",fontSize:12}}>
+                color:"#fff",borderRadius:6,padding:"6px 0",fontSize:12}}>
               {dark?"☀":"🌙"}
             </button>
             <button onClick={()=>setShowTut(true)}
               style={{flex:1,background:"none",border:"1px solid rgba(255,255,255,.1)",
-                color:"rgba(255,255,255,.3)",borderRadius:6,padding:"6px 0",fontSize:10}}>? Help</button>
+                color:"#fff",borderRadius:6,padding:"6px 0",fontSize:10}}>? Help</button>
             <button onClick={logout}
               style={{flex:1,background:"none",border:"1px solid rgba(255,255,255,.1)",
-                color:"rgba(255,255,255,.3)",borderRadius:6,padding:"6px 0",fontSize:10}}>Out</button>
+                color:"#fff",borderRadius:6,padding:"6px 0",fontSize:10}}>Out</button>
           </div>
         </aside>
         <main className="app-main">
@@ -711,14 +712,14 @@ export default function App() {
 function Spinner() {
   const T=useT();
   return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",
-    background:T.bg,color:T.muted,fontFamily:"'DM Mono',monospace",fontSize:13}}>Loading…</div>;
+    background:T.bg,color:T.muted,fontFamily:"'Barlow Condensed',sans-serif",fontSize:13}}>Loading…</div>;
 }
 function EmptyState({onAdd}) {
   const T=useT();
   return (
     <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,height:"100%"}}>
       <div style={{fontSize:52,opacity:.1}}>🪑</div>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,opacity:.35,color:T.dark}}>No class selected</div>
+      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,opacity:.35,color:T.dark}}>No class selected</div>
       <ABtn onClick={onAdd}>Create your first class</ABtn>
     </div>
   );
@@ -731,7 +732,7 @@ function ClassView({cls,tab,setTab,upd}) {
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%",minHeight:0}}>
       <div className="class-header">
-        <div style={{fontFamily:"'Playfair Display',serif",fontSize:24,marginBottom:14,color:T.dark}}>{cls.name}</div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,marginBottom:14,color:T.dark}}>{cls.name}</div>
         <div className="tab-strip">
           {TABS.map(t=>(
             <button key={t} className="tab-btn" onClick={()=>setTab(t)}
@@ -1113,7 +1114,7 @@ function LayoutTab({cls,upd}) {
                     value={commonRot}
                     onChange={e=>{const t=+e.target.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,rotation:t}:d));}}
                     style={{width:130,cursor:"pointer"}}/>
-                  <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,minWidth:36,color:T.dark}}>{commonRot}°</span>
+                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,minWidth:36,color:T.dark}}>{commonRot}°</span>
                   <button onClick={()=>rotateSel(90)}
                     style={{background:"none",border:`1px solid ${T.border}`,borderRadius:5,padding:"3px 8px",fontSize:11,color:T.dark}}>+90°</button>
                   <button onClick={()=>applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,rotation:0}:d))}
@@ -1128,7 +1129,7 @@ function LayoutTab({cls,upd}) {
                     value={commonScale}
                     onChange={e=>{const t=+e.target.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:t}:d));}}
                     style={{width:130,cursor:"pointer"}}/>
-                  <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,minWidth:36,color:T.dark}}>×{commonScale.toFixed(1)}</span>
+                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,minWidth:36,color:T.dark}}>×{commonScale.toFixed(1)}</span>
                   <button onClick={()=>applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:1}:d))}
                     style={{background:"none",border:`1px solid ${T.border}`,borderRadius:5,padding:"3px 8px",fontSize:11,color:T.dark}}>↺</button>
                 </div>
@@ -1219,7 +1220,7 @@ function LayoutTab({cls,upd}) {
                 backgroundSize:`${GRID_SZ}px ${GRID_SZ}px`,
                 clipPath:roomClip,overflow:"hidden",pointerEvents:"none"}}>
                 <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",
-                  background:T.isDark?"#444":"#222",color:"#F7F3EC",fontSize:9,padding:"3px 20px",
+                background:T.isDark?"#444":"#222",color:"#fff",fontSize:9,padding:"3px 20px",
                   borderRadius:3,letterSpacing:2,opacity:.4}}>BOARD</div>
                 {lasso&&<div style={{position:"absolute",left:Math.min(lasso.x1,lasso.x2),top:Math.min(lasso.y1,lasso.y2),
                   width:Math.abs(lasso.x2-lasso.x1),height:Math.abs(lasso.y2-lasso.y1),
@@ -1293,7 +1294,7 @@ function LayoutTab({cls,upd}) {
         ):(
           <div style={{width:CW,height:CH,display:"flex",alignItems:"center",justifyContent:"center",
             background:T.panel,borderRadius:10,border:`1px dashed ${T.border}`,flexDirection:"column",gap:12}}>
-            <div style={{opacity:.3,fontFamily:"'Playfair Display',serif",fontSize:18,color:T.dark}}>No layout selected</div>
+            <div style={{opacity:.3,fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,color:T.dark}}>No layout selected</div>
             <ABtn onClick={()=>setAddLyt(true)}>Create a layout</ABtn>
           </div>
         )}
@@ -1357,7 +1358,7 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
     <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
       justifyContent:"center",pointerEvents:"none",zIndex:2}}>
       {filled ? (
-        <span style={{fontFamily:"'DM Sans',sans-serif",display:"flex",flexDirection:"column",
+        <span style={{fontFamily:"'Barlow Condensed',sans-serif",display:"flex",flexDirection:"column",
           alignItems:"center",justifyContent:"center",gap:2,
           fontSize: Math.max(5, (assignedStudents.length>1?6.8:8.5) * Math.min(sc, 1.8)),
           fontWeight:500, color:"#fff", textAlign:"center",
@@ -1385,7 +1386,7 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
           })}
         </span>
       ) : (
-        <span style={{fontFamily:"'DM Mono',monospace",
+        <span style={{fontFamily:"'Barlow Condensed',sans-serif",
           fontSize: Math.max(5, 8 * Math.min(sc, 1.8)),
           color: isSelected ? T.sel : T.muted, textAlign:"center", lineHeight:1.25}}>
           <span style={{display:"block"}}>desk</span>
@@ -1421,7 +1422,7 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
         onClick={()=>onCapacityChange(seat.id,-1)}
         style={{width:18,height:18,border:"none",background:"none",color:capacity<=1?T.border:T.muted,
           fontSize:13,lineHeight:"18px",padding:0,cursor:capacity<=1?"default":"pointer"}}>−</button>
-      <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:T.dark,minWidth:14,textAlign:"center"}}>
+      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,color:T.dark,minWidth:14,textAlign:"center"}}>
         {capacity}
       </span>
       <button title="Increase table capacity"
@@ -1497,7 +1498,7 @@ function CtxMenu({x,y,sid,hasSel,hasClip,onClose,onDelete,onDupe,onCopy,onPaste,
     <div className="ctx-item" onMouseDown={e=>{e.stopPropagation();if(!disabled){onClick();onClose();}}}
       style={{padding:"8px 14px",fontSize:12,display:"flex",justifyContent:"space-between",gap:20,
         cursor:disabled?"default":"pointer",color:disabled?T.muted:danger?"#E53E3E":T.dark,background:"transparent",userSelect:"none"}}>
-      <span>{label}</span>{sc&&<span style={{color:T.muted,fontFamily:"'DM Mono',monospace",fontSize:10}}>{sc}</span>}
+      <span>{label}</span>{sc&&<span style={{color:T.muted,fontFamily:"'Barlow Condensed',sans-serif",fontSize:10}}>{sc}</span>}
     </div>
   );
   const Sep=()=><div style={{height:1,background:T.border,margin:"3px 0"}}/>;
@@ -1600,7 +1601,7 @@ function StudentsTab({cls,upd}) {
           <textarea value={raw} onChange={e=>setRaw(e.target.value)}
             placeholder={"Alice Johnson\nBob Smith\nCarla Davis\n..."}
             style={{width:"100%",height:220,border:`1px solid ${T.border}`,borderRadius:8,padding:14,
-              fontSize:13,fontFamily:"'DM Mono',monospace",background:T.panel,resize:"vertical",
+              fontSize:13,fontFamily:"'Barlow Condensed',sans-serif",background:T.panel,resize:"vertical",
               outline:"none",lineHeight:1.9,color:T.dark}}/>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,gap:8}}>
             <span style={{fontSize:12,color:T.muted}}>{cnt} student{cnt!==1?"s":""}</span>
@@ -1756,7 +1757,7 @@ function ChemistryTab({cls,upd}) {
                     <rect x={bx-13} y={by-9} width={26} height={16} rx={4}
                       fill={T.panel} stroke={col} strokeWidth={1.5}/>
                     <text x={bx} y={by+4} textAnchor="middle" fontSize={9}
-                      fill={col} fontWeight={700} style={{pointerEvents:"none"}}>
+                      fill={T.dark} fontWeight={600} style={{pointerEvents:"none"}}>
                       {v}
                     </text>
                   </g>
@@ -1783,14 +1784,14 @@ function ChemistryTab({cls,upd}) {
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                     <span style={{fontSize:10,color:T.muted}}>Chemistry</span>
-                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:col,fontWeight:700}}>{v}</span>
+                    <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,color:T.dark,fontWeight:600}}>{v}</span>
                   </div>
                   <input type="range" min={0} max={100} step={5} value={v}
                     onChange={e=>setChem(editing.a,editing.b,+e.target.value)} style={{width:"100%",accentColor:col}}/>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:T.muted,marginTop:2}}>
-                    <span style={{color:"#E53E3E"}}>0 Never</span>
-                    <span style={{color:"#C8C820"}}>50 Caution</span>
-                    <span style={{color:"#3AA840"}}>100 Fine</span>
+                    <span style={{color:T.dark}}>0 Never</span>
+                    <span style={{color:T.dark}}>50 Caution</span>
+                    <span style={{color:T.dark}}>100 Fine</span>
                   </div>
                   <button onClick={()=>setEditing(null)}
                     style={{marginTop:10,width:"100%",background:"none",border:`1px solid ${T.border}`,
@@ -1824,7 +1825,7 @@ function PresenterView({cls,layout,result,studentMeta,allGrades,locked,onClose})
       color:T.dark,display:"flex",flexDirection:"column",alignItems:"center",padding:"28px 28px 22px"}}>
       <div style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,marginBottom:18}}>
         <div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:34,lineHeight:1,color:T.dark}}>{cls.name}</div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:34,lineHeight:1,color:T.dark}}>{cls.name}</div>
           <div style={{fontSize:12,letterSpacing:2,color:T.muted,marginTop:8,textTransform:"uppercase"}}>
             {layout.name} seating chart
           </div>
@@ -1845,7 +1846,7 @@ function PresenterView({cls,layout,result,studentMeta,allGrades,locked,onClose})
             backgroundSize:`${GRID_SZ}px ${GRID_SZ}px`,
             clipPath:polyToClip(layout.roomPoly??DEFAULT_ROOM()),overflow:"hidden",pointerEvents:"none"}}>
             <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",
-              background:"#222",color:"#F7F3EC",fontSize:9,padding:"3px 20px",borderRadius:3,letterSpacing:2,opacity:.45}}>
+              background:"#222",color:"#fff",fontSize:9,padding:"3px 20px",borderRadius:3,letterSpacing:2,opacity:.45}}>
               BOARD
             </div>
           </div>
@@ -1872,7 +1873,7 @@ function PresenterView({cls,layout,result,studentMeta,allGrades,locked,onClose})
         <span style={{fontSize:12,letterSpacing:2,color:T.muted}}>GRADE</span>
         {allGrades.map(g=>(
           <span key={g} style={{background:gradeColor(g,allGrades,T),color:gradeTextColor(g),
-            fontSize:13,padding:"5px 12px",borderRadius:999,fontWeight:700,boxShadow:"0 2px 8px rgba(0,0,0,.14)"}}>
+            fontSize:13,padding:"5px 12px",borderRadius:999,fontWeight:600,boxShadow:"0 2px 8px rgba(0,0,0,.14)"}}>
             {g}
           </span>
         ))}
@@ -2053,7 +2054,7 @@ function RandomizeTab({cls}) {
               backgroundSize:`${GRID_SZ}px ${GRID_SZ}px`,
               clipPath:polyToClip(layout.roomPoly??DEFAULT_ROOM()),overflow:"hidden",pointerEvents:"none"}}>
               <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",
-                background:"#222",color:"#F7F3EC",fontSize:9,padding:"3px 20px",borderRadius:3,letterSpacing:2,opacity:.4}}>BOARD</div>
+                background:"#222",color:"#fff",fontSize:9,padding:"3px 20px",borderRadius:3,letterSpacing:2,opacity:.4}}>BOARD</div>
               {showR&&hov&&<div style={{position:"absolute",left:hov.x-radius,top:hov.y-radius,
                 width:radius*2,height:radius*2,borderRadius:"50%",
                 border:`1.5px dashed ${T.accent}`,background:`${T.accent}08`,pointerEvents:"none"}}/>}
@@ -2092,11 +2093,11 @@ function RandomizeTab({cls}) {
           {result&&(allGrades.length>0||Object.values(studentMeta).some(m=>m?.gender))&&(
             <div style={{marginTop:12,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
               {allGrades.length>0&&<><span style={{fontSize:10,letterSpacing:2,color:T.muted}}>GRADE:</span>
-                {allGrades.map(g=><span key={g} style={{background:gradeColor(g,allGrades,T),color:"#fff",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:700}}>{g}</span>)}</>}
+                {allGrades.map(g=><span key={g} style={{background:gradeColor(g,allGrades,T),color:gradeTextColor(g),fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:600}}>{g}</span>)}</>}
               {Object.values(studentMeta).some(m=>m?.gender)&&<>
                 <span style={{fontSize:10,letterSpacing:2,color:T.muted,marginLeft:8}}>GENDER:</span>
                 {[["M",T.gMale],["F",T.gFemale],["X",T.gOther]].map(([g,col])=>(
-                  <span key={g} style={{background:col,color:"#fff",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:700}}>{g}</span>
+                  <span key={g} style={{background:col,color:"#fff",fontSize:10,padding:"2px 8px",borderRadius:10,fontWeight:600}}>{g}</span>
                 ))}
               </>}
             </div>
@@ -2128,7 +2129,7 @@ function SettingsSlider({value, onChange, min, max, step}) {
         value={local}
         onChange={e=>{const v=+e.target.value; setLocal(v); onChange(v);}}
         style={{flex:1,cursor:"pointer"}}/>
-      <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,minWidth:32,
+      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,minWidth:32,
         textAlign:"right",color:T.dark}}>{local}</span>
     </div>
   );
@@ -2163,7 +2164,7 @@ function SettingsTab({cls,upd}) {
   const Sec=({t})=><div style={{fontSize:10,letterSpacing:2,color:T.muted,marginTop:24,marginBottom:2}}>{t}</div>;
   return (//s
     <div style={{maxWidth:680}}>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,marginBottom:4,color:T.dark}}>Randomization Settings</div>
+      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,marginBottom:4,color:T.dark}}>Randomization Settings</div>
       <p style={{color:T.muted,fontSize:13,marginBottom:24,lineHeight:1.6}}>Higher weights enforce constraints more strongly relative to chemistry scores.</p>
       <Sec t="PROXIMITY"/>
       <Row label="Neighbor radius" desc={`Desks within this range are "neighbors" for scoring. Currently ${s.proximityRadius??120}px.`}>
@@ -2200,7 +2201,7 @@ function ControlsTab() {
       <div style={{display:"flex",gap:4,minWidth:180,flexWrap:"wrap"}}>
         {keys.map((k,i)=>(
           <kbd key={i} style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:5,
-            padding:"3px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:T.dark,
+            padding:"3px 8px",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,color:T.dark,
             boxShadow:"0 1px 2px rgba(0,0,0,.1)",whiteSpace:"nowrap"}}>{k}</kbd>
         ))}
       </div>
@@ -2210,7 +2211,7 @@ function ControlsTab() {
 
   return (
     <div style={{maxWidth:720}}>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,marginBottom:6,color:T.dark}}>Controls Reference</div>
+      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,marginBottom:6,color:T.dark}}>Controls Reference</div>
       <p style={{color:T.muted,fontSize:13,marginBottom:28,lineHeight:1.6}}>All keyboard shortcuts and interaction patterns in one place.</p>
 
       <Sec title="PLACING DESKS">
