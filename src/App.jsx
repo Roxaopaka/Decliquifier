@@ -194,6 +194,26 @@ const mkClass = name=>({
   settings:{proximityRadius:120,separateGenders:false,genderWeight:50,mixGrades:false,gradeWeight:50},
 });
 const mkLayout = name=>({id:uid(),name,seats:[],roomPoly:DEFAULT_ROOM()});
+const cloneSeatsForLayout = seats => (seats??[]).map(seat=>mkSeat({
+  ...seat,
+  id:uid(),
+  capacity:seatCapacity(seat),
+}));
+const cloneRoomPoly = poly => (poly??DEFAULT_ROOM()).map(p=>({x:p.x,y:p.y}));
+const mkSavedLayout = (layout,name,sourceClass)=>({
+  id:uid(),
+  name,
+  sourceClass,
+  seats:cloneSeatsForLayout(layout?.seats),
+  roomPoly:cloneRoomPoly(layout?.roomPoly),
+  savedAt:Date.now(),
+});
+const layoutFromSaved = saved=>({
+  id:uid(),
+  name:saved?.name||"Saved layout",
+  seats:cloneSeatsForLayout(saved?.seats),
+  roomPoly:cloneRoomPoly(saved?.roomPoly),
+});
 
 // ─── SA optimizer ─────────────────────────────────────────────────────────────
 function scoreFn(asgn,seats,chem,r,studentMeta={},settings={}) {
@@ -370,9 +390,21 @@ const mkStyles = T => `
   .canvas-column{flex:1;min-width:0}
   .canvas-scroll{max-width:100%;overflow:auto;padding:2px 2px 10px;-webkit-overflow-scrolling:touch}
   .canvas-stage{position:relative;width:${CW}px;height:${CH}px}
-  .students-shell{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
-  .student-editor{flex:0 0 290px}
-  .student-meta-panel{flex:1;min-width:260px}
+  .students-shell{display:grid;grid-template-columns:minmax(280px,330px) minmax(320px,1fr) minmax(260px,.8fr);gap:24px;align-items:flex-start}
+  .student-editor,.student-meta-panel,.student-roster-panel{min-width:0}
+  .chemistry-shell{display:grid;grid-template-columns:220px minmax(540px,720px) minmax(260px,1fr);gap:20px;align-items:flex-start;width:100%}
+  .chemistry-list{width:220px}
+  .chemistry-graph-panel{min-width:0;position:relative}
+  .insight-panel{background:${T.panel};border:1px solid ${T.border};border-radius:10px;padding:16px;min-width:0;color:${T.dark}}
+  .settings-shell{display:grid;grid-template-columns:minmax(480px,720px) minmax(260px,1fr);gap:28px;align-items:start}
+  .controls-grid{display:grid;grid-template-columns:repeat(2,minmax(280px,1fr));gap:12px 32px;align-items:start}
+  @media (max-width:1180px){
+    .students-shell{grid-template-columns:minmax(280px,330px) minmax(320px,1fr)}
+    .student-roster-panel{grid-column:1/-1}
+    .chemistry-shell{grid-template-columns:220px minmax(540px,1fr)}
+    .chemistry-shell .insight-panel{grid-column:1/-1}
+    .settings-shell{grid-template-columns:minmax(480px,1fr)}
+  }
   @media (max-width:760px){
     .app-shell{height:100svh;flex-direction:column}
     .app-sidebar{width:100%;max-height:38svh;padding:16px 14px 12px}
@@ -385,9 +417,9 @@ const mkStyles = T => `
     .layout-rail{width:100%;margin-bottom:14px}
     .canvas-column{width:100%}
     .canvas-scroll{border-radius:10px;background:${T.panel};border:1px solid ${T.border}}
-    .students-shell{display:block}
-    .student-editor,.student-meta-panel{width:100%;min-width:0;flex:auto}
-    .student-meta-panel{margin-top:20px}
+    .students-shell,.chemistry-shell,.settings-shell,.controls-grid{display:block}
+    .student-editor,.student-meta-panel,.student-roster-panel,.chemistry-list{width:100%;min-width:0}
+    .student-meta-panel,.student-roster-panel,.chemistry-graph-panel,.insight-panel{margin-top:20px}
     .mobile-stack{width:100%!important}
     .mobile-fill{width:100%!important;min-width:0!important}
     .krow{align-items:flex-start!important;gap:8px!important;flex-direction:column}
@@ -596,6 +628,7 @@ export default function App() {
   const [teacher,setTeacher]     = useState(null);
   const [authReady,setAuthReady] = useState(false);
   const [classes,setClasses]     = useState({});
+  const [savedLayouts,setSavedLayouts] = useState({});
   const [active,setActive]       = useState(null);
   const [tab,setTab]             = useState("layout");
   const [dataReady,setDataReady] = useState(false);
@@ -629,18 +662,30 @@ export default function App() {
   },[]);
 
   useEffect(()=>{
-    if(!teacher){setClasses({});setActive(null);setDataReady(false);return;}
+    if(!teacher){setClasses({});setSavedLayouts({});setActive(null);setDataReady(false);return;}
     (async()=>{
       setDataReady(false);
-      try{const r=await safeStorage.get(`sc-data-${teacher}`);if(r){const d=JSON.parse(r.value);setClasses(d.c||{});setActive(d.a||null);}else{setClasses({});setActive(null);}}catch{}
+      try{
+        const r=await safeStorage.get(`sc-data-${teacher}`);
+        if(r){
+          const d=JSON.parse(r.value);
+          setClasses(d.c||{});
+          setSavedLayouts(d.s||d.savedLayouts||{});
+          setActive(d.a||null);
+        }else{
+          setClasses({});
+          setSavedLayouts({});
+          setActive(null);
+        }
+      }catch{}
       setDataReady(true);
     })();
   },[teacher]);
 
   useEffect(()=>{
     if(!teacher||!dataReady) return;
-    safeStorage.set(`sc-data-${teacher}`,JSON.stringify({c:classes,a:active})).catch(()=>{});
-  },[classes,active,teacher,dataReady]);
+    safeStorage.set(`sc-data-${teacher}`,JSON.stringify({c:classes,a:active,s:savedLayouts})).catch(()=>{});
+  },[classes,active,savedLayouts,teacher,dataReady]);
 
   useEffect(()=>{if(addingCls)clsRef.current?.focus();},[addingCls]);
 
@@ -661,6 +706,7 @@ export default function App() {
     // Synchronously reset all state so the login screen shows immediately
     setTeacher(null);
     setClasses({});
+    setSavedLayouts({});
     setActive(null);
     setDataReady(false);
     setShowTut(false);
@@ -739,7 +785,8 @@ export default function App() {
         </aside>
         <main className="app-main">
           {!cls?<EmptyState onAdd={()=>setAddingCls(true)}/>
-            :<ClassView key={active} cls={cls} tab={tab} setTab={setTab} upd={fn=>upd(active,fn)}/>}
+            :<ClassView key={active} cls={cls} tab={tab} setTab={setTab} upd={fn=>upd(active,fn)}
+              savedLayouts={savedLayouts} setSavedLayouts={setSavedLayouts}/>}
         </main>
       </div>
     </ThemeCtx.Provider>
@@ -763,7 +810,7 @@ function EmptyState({onAdd}) {
 }
 
 // ─── class view ───────────────────────────────────────────────────────────────
-function ClassView({cls,tab,setTab,upd}) {
+function ClassView({cls,tab,setTab,upd,savedLayouts,setSavedLayouts}) {
   const T=useT();
   const TABS=["layout","students","chemistry","randomize","settings","controls"];
   return (
@@ -782,7 +829,7 @@ function ClassView({cls,tab,setTab,upd}) {
         </div>
       </div>
       <div className="class-content">
-        {tab==="layout"    &&<LayoutTab    cls={cls} upd={upd}/>}
+        {tab==="layout"    &&<LayoutTab    cls={cls} upd={upd} savedLayouts={savedLayouts} setSavedLayouts={setSavedLayouts}/>}
         {tab==="students"  &&<StudentsTab  cls={cls} upd={upd}/>}
         {tab==="chemistry" &&<ChemistryTab cls={cls} upd={upd}/>}
         {tab==="randomize" &&<RandomizeTab cls={cls}/>}
@@ -794,7 +841,7 @@ function ClassView({cls,tab,setTab,upd}) {
 }
 
 // ─── LAYOUT TAB ───────────────────────────────────────────────────────────────
-function LayoutTab({cls,upd}) {
+function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
   const T=useT();
   const canvasRef   = useRef(null);
   const clsRef      = useRef(cls);   useEffect(()=>{clsRef.current=cls;},[cls]);
@@ -973,9 +1020,24 @@ function LayoutTab({cls,upd}) {
 
   const layouts=Object.values(cls.layouts);
   const active=cls.activeLayoutId?cls.layouts[cls.activeLayoutId]:null;
+  const savedLayoutList=Object.values(savedLayouts).sort((a,b)=>(b.savedAt??0)-(a.savedAt??0));
 
   const submitLyt=()=>{const nm=newLytName.trim();if(!nm)return;const l=mkLayout(nm);upd(c=>({...c,layouts:{...c.layouts,[l.id]:l},activeLayoutId:l.id}));setAddLyt(false);setLytNm("");};
   const delLyt=id=>upd(c=>{const ls={...c.layouts};delete ls[id];return{...c,layouts:ls,activeLayoutId:c.activeLayoutId===id?(Object.keys(ls)[0]||null):c.activeLayoutId};});
+  const saveCurrentLayout=()=>{
+    if(!active||!setSavedLayouts)return;
+    const name=window.prompt("Save this layout for other classes as:", active.name);
+    const clean=name?.trim();
+    if(!clean)return;
+    const saved=mkSavedLayout(active,clean,cls.name);
+    setSavedLayouts(ls=>({...ls,[saved.id]:saved}));
+  };
+  const importSavedLayout=id=>{
+    const saved=savedLayouts[id];if(!saved)return;
+    const l=layoutFromSaved(saved);
+    upd(c=>({...c,layouts:{...c.layouts,[l.id]:l},activeLayoutId:l.id}));
+    setSel(new Set());setCtxMenu(null);setEditPoly(false);setPlacingVtx(false);
+  };
   const applyPreset=pid=>{if(!active)return;const p=TABLE_PRESETS.find(p=>p.id===pid);if(!p)return;saveHist();const ns=p.fn(CW/2,CH/2,activeShape);applySeats(s=>[...s,...ns]);setSel(new Set(ns.map(s=>s.id)));};
   const applyRoom=pid=>{if(!active)return;const p=ROOM_PRESETS.find(p=>p.id===pid);if(!p)return;updRef.current(c=>({...c,layouts:{...c.layouts,[active.id]:{...active,roomPoly:p.fn()}}}));};
   // Find which polygon edge is nearest to (x,y) and return the index to insert after
@@ -1082,6 +1144,23 @@ function LayoutTab({cls,upd}) {
             <button onClick={()=>setAddLyt(true)}
               style={{background:"none",border:`1px dashed ${T.border}`,padding:"7px 10px",borderRadius:6,fontSize:12,color:T.muted}}>+ Add layout</button>
           )}
+          {active&&(
+            <button onClick={saveCurrentLayout}
+              style={{background:T.accentLt,border:`1px solid ${T.accent}`,padding:"7px 10px",borderRadius:6,fontSize:12,color:T.accent,fontWeight:500}}>
+              Save to library
+            </button>
+          )}
+          <select defaultValue="" onChange={e=>{if(e.target.value){importSavedLayout(e.target.value);e.target.value="";}}}
+            disabled={!savedLayoutList.length}
+            style={{border:`1px solid ${T.border}`,borderRadius:6,padding:"7px 10px",fontSize:12,background:T.panel,
+              color:savedLayoutList.length?T.dark:T.muted,cursor:savedLayoutList.length?"pointer":"default"}}>
+            <option value="">{savedLayoutList.length?"Use saved layout…":"No saved layouts"}</option>
+            {savedLayoutList.map(l=>(
+              <option key={l.id} value={l.id}>
+                {l.name}{l.sourceClass?` · ${l.sourceClass}`:""} · {l.seats?.length??0} desks
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -1626,7 +1705,7 @@ function StudentsTab({cls,upd}) {
   };
 
   return (
-    <div style={{maxWidth:720}}>
+    <div style={{width:"100%"}}>
       <p style={{color:T.muted,fontSize:13,marginBottom:14,lineHeight:1.6}}>
         One student per line. Set gender and grade below for randomization constraints.
       </p>
@@ -1682,11 +1761,10 @@ function StudentsTab({cls,upd}) {
             <ABtn onClick={save} style={{marginTop:10}}>Save metadata</ABtn>
           </div>
         )}
-      </div>
-      {cls.students.length>0&&(
-        <div style={{marginTop:22}}>
-          <div style={{fontSize:9,letterSpacing:2,opacity:.35,marginBottom:10,color:T.dark}}>SAVED ({cls.students.length})</div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {cls.students.length>0&&(
+          <div className="student-roster-panel" style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:10,padding:16}}>
+            <div style={{fontSize:9,letterSpacing:2,opacity:.35,marginBottom:10,color:T.dark}}>SAVED ({cls.students.length})</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,maxHeight:390,overflowY:"auto"}}>
             {cls.students.map(s=>{const m=cls.studentMeta?.[s]??{};const gc=m.gender?genderColor(m.gender,T):null;
               return (
                 <span key={s} style={{background:T.chip,padding:"3px 10px",borderRadius:20,fontSize:12,display:"flex",alignItems:"center",gap:5,color:T.dark}}>
@@ -1695,9 +1773,24 @@ function StudentsTab({cls,upd}) {
                 </span>
               );
             })}
+            </div>
+            <div style={{marginTop:14,display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8}}>
+              <div style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px"}}>
+                <div style={{fontSize:9,letterSpacing:1.5,color:T.muted,marginBottom:4}}>WITH GRADE</div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:T.dark}}>
+                  {cls.students.filter(s=>cls.studentMeta?.[s]?.grade).length}
+                </div>
+              </div>
+              <div style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px"}}>
+                <div style={{fontSize:9,letterSpacing:1.5,color:T.muted,marginBottom:4}}>WITH GENDER</div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:T.dark}}>
+                  {cls.students.filter(s=>cls.studentMeta?.[s]?.gender).length}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -1719,11 +1812,21 @@ function ChemistryTab({cls,upd}) {
   const others=sel?students.filter(s=>s!==sel):[];
   const n=others.length;
   const R=Math.min(cx,cy)-55;
+  const pairValues=[];
+  for(let i=0;i<students.length;i++) for(let j=i+1;j<students.length;j++){
+    const a=students[i],b=students[j],v=getV(a,b);
+    pairValues.push({a,b,v,label:lbl(v)});
+  }
+  const selectedPairs=sel?pairValues.filter(p=>p.a===sel||p.b===sel).sort((a,b)=>a.v-b.v):[];
+  const avg=pairValues.length?Math.round(pairValues.reduce((sum,p)=>sum+p.v,0)/pairValues.length):0;
+  const avoidCount=pairValues.filter(p=>p.v<=25).length;
+  const cautionCount=pairValues.filter(p=>p.v>25&&p.v<=50).length;
+  const fineCount=pairValues.filter(p=>p.v>75).length;
 
   return (
-    <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+    <div className="chemistry-shell">
       {/* Student list */}
-      <div style={{width:180,flexShrink:0}}>
+      <div className="chemistry-list">
         <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:10}}>STUDENTS — click to view</div>
         <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:460,overflowY:"auto"}}>
           {students.map(s=>(
@@ -1743,7 +1846,7 @@ function ChemistryTab({cls,upd}) {
       </div>
 
       {/* Radial graph */}
-      <div style={{flex:1,position:"relative"}}>
+      <div className="chemistry-graph-panel">
         {!sel?(
           <div style={{width:W,height:H,display:"flex",alignItems:"center",justifyContent:"center",
             background:T.panel,borderRadius:12,border:`1px solid ${T.border}`,flexDirection:"column",gap:12}}>
@@ -1836,6 +1939,49 @@ function ChemistryTab({cls,upd}) {
             })()}
           </div>
         )}
+      </div>
+      <div className="insight-panel">
+        <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:12}}>CHEMISTRY OVERVIEW</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8,marginBottom:16}}>
+          {[
+            ["AVG",avg,T.accent],
+            ["AVOID",avoidCount,"#E53E3E"],
+            ["FINE",fineCount,"#3AA840"],
+          ].map(([label,value,color])=>(
+            <div key={label} style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 8px",textAlign:"center"}}>
+              <div style={{fontSize:9,letterSpacing:1.4,color:T.muted,marginBottom:4}}>{label}</div>
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color,fontWeight:700}}>{value}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{fontSize:12,color:T.muted,lineHeight:1.6,marginBottom:16}}>
+          {sel
+            ? `${sel} has ${selectedPairs.filter(p=>p.v<=50).length} pair${selectedPairs.filter(p=>p.v<=50).length!==1?"s":""} that need seating attention.`
+            : `This class has ${pairValues.length} chemistry pair${pairValues.length!==1?"s":""}. Select a student to inspect their closest risks.`}
+        </div>
+        <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:8}}>
+          {sel?"NEEDS ATTENTION":"LOWEST PAIRS"}
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>
+          {(sel?selectedPairs:pairValues.sort((a,b)=>a.v-b.v)).slice(0,6).map(p=>(
+            <button key={`${p.a}-${p.b}`} onClick={()=>{setSel(p.a);setEditing({a:p.a,b:p.b,x:W-190,y:60});}}
+              style={{display:"flex",alignItems:"center",gap:8,background:T.bg,border:`1px solid ${T.border}`,borderRadius:7,
+                padding:"7px 9px",fontSize:11,color:T.dark,textAlign:"left"}}>
+              <span style={{width:8,height:8,borderRadius:"50%",background:chemCol(p.v),flexShrink:0}}/>
+              <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {p.a.split(" ")[0]} ↔ {p.b.split(" ")[0]}
+              </span>
+              <span style={{fontFamily:"'DM Mono',monospace",color:chemCol(p.v),fontWeight:700}}>{p.v}</span>
+            </button>
+          ))}
+          {!pairValues.length&&<div style={{fontSize:12,color:T.muted}}>No chemistry pairs yet.</div>}
+        </div>
+        <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:8}}>DISTRIBUTION</div>
+        <div style={{height:9,borderRadius:999,overflow:"hidden",display:"flex",background:T.bg,border:`1px solid ${T.border}`}}>
+          <div style={{width:`${pairValues.length?(avoidCount/pairValues.length)*100:0}%`,background:"#E53E3E"}}/>
+          <div style={{width:`${pairValues.length?(cautionCount/pairValues.length)*100:0}%`,background:"#C8C820"}}/>
+          <div style={{width:`${pairValues.length?(fineCount/pairValues.length)*100:0}%`,background:"#3AA840"}}/>
+        </div>
       </div>
     </div>
   );
@@ -2197,26 +2343,44 @@ function SettingsTab({cls,upd}) {
     <SettingsSlider value={s[f]??Math.round((min+max)/2)} onChange={v=>set(f,v)} min={min} max={max} step={step}/>
   );//s
   const Sec=({t})=><div style={{fontSize:10,letterSpacing:2,color:T.muted,marginTop:24,marginBottom:2}}>{t}</div>;
+  const activeRules=[
+    ["Neighbor radius",`${s.proximityRadius??120}px`],
+    ["Gender separation",s.separateGenders?`On · ${s.genderWeight??50}`:"Off"],
+    ["Grade mixing",s.mixGrades?`On · ${s.gradeWeight??50}`:"Off"],
+  ];
   return (//s
-    <div style={{maxWidth:680}}>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,marginBottom:4,color:T.dark}}>Randomization Settings</div>
-      <p style={{color:T.muted,fontSize:13,marginBottom:24,lineHeight:1.6}}>Higher weights enforce constraints more strongly relative to chemistry scores.</p>
-      <Sec t="PROXIMITY"/>
-      <Row label="Neighbor radius" desc={`Desks within this range are "neighbors" for scoring. Currently ${s.proximityRadius??120}px.`}>
-        <Slider f="proximityRadius" min={40} max={300} step={10}/>
-      </Row>
-      <Sec t="GENDER"/>
-      <Row label="Separate genders" desc="Penalizes same-gender neighbors. Requires gender data in Students tab.">
-        <Toggle f="separateGenders" label="Enable gender separation"/>
-      </Row>
-      {s.separateGenders&&<Row label="Gender penalty weight" desc="Extra penalty per same-gender pair. Raise above 100 to override chemistry."><Slider f="genderWeight" min={0} max={150} step={5}/></Row>}
-      <Sec t="GRADE LEVEL"/>
-      <Row label="Mix grade levels" desc="Penalizes same-grade neighbors, encouraging cross-grade mixing. Requires grade data.">
-        <Toggle f="mixGrades" label="Encourage grade mixing"/>
-      </Row>
-      {s.mixGrades&&<Row label="Grade mixing weight" desc="Extra penalty per same-grade pair."><Slider f="gradeWeight" min={0} max={150} step={5}/></Row>}
-      <div style={{marginTop:28,background:T.tipBg,border:`1px solid ${T.tipBorder}`,borderRadius:8,padding:"14px 16px",fontSize:12,color:T.tipText,lineHeight:1.8}}>
-        <strong>Tip:</strong> Chemistry "Avoid" pairs contribute up to 80pts. Set constraint weights above 80 to override them. Run Randomize several times — SA is stochastic.
+    <div className="settings-shell">
+      <div>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,marginBottom:4,color:T.dark}}>Randomization Settings</div>
+        <p style={{color:T.muted,fontSize:13,marginBottom:24,lineHeight:1.6}}>Higher weights enforce constraints more strongly relative to chemistry scores.</p>
+        <Sec t="PROXIMITY"/>
+        <Row label="Neighbor radius" desc={`Desks within this range are "neighbors" for scoring. Currently ${s.proximityRadius??120}px.`}>
+          <Slider f="proximityRadius" min={40} max={300} step={10}/>
+        </Row>
+        <Sec t="GENDER"/>
+        <Row label="Separate genders" desc="Penalizes same-gender neighbors. Requires gender data in Students tab.">
+          <Toggle f="separateGenders" label="Enable gender separation"/>
+        </Row>
+        {s.separateGenders&&<Row label="Gender penalty weight" desc="Extra penalty per same-gender pair. Raise above 100 to override chemistry."><Slider f="genderWeight" min={0} max={150} step={5}/></Row>}
+        <Sec t="GRADE LEVEL"/>
+        <Row label="Mix grade levels" desc="Penalizes same-grade neighbors, encouraging cross-grade mixing. Requires grade data.">
+          <Toggle f="mixGrades" label="Encourage grade mixing"/>
+        </Row>
+        {s.mixGrades&&<Row label="Grade mixing weight" desc="Extra penalty per same-grade pair."><Slider f="gradeWeight" min={0} max={150} step={5}/></Row>}
+      </div>
+      <div className="insight-panel">
+        <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:12}}>CURRENT RULES</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:18}}>
+          {activeRules.map(([label,value])=>(
+            <div key={label} style={{display:"flex",justifyContent:"space-between",gap:12,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px"}}>
+              <span style={{fontSize:12,color:T.dark}}>{label}</span>
+              <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:T.accent,fontWeight:700}}>{value}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{background:T.tipBg,border:`1px solid ${T.tipBorder}`,borderRadius:8,padding:"14px 16px",fontSize:12,color:T.tipText,lineHeight:1.8}}>
+          <strong>Tip:</strong> Chemistry "Avoid" pairs contribute up to 80pts. Set constraint weights above 80 to override them. Run Randomize several times — SA is stochastic.
+        </div>
       </div>
     </div>
   );
@@ -2245,91 +2409,93 @@ function ControlsTab() {
   );
 
   return (
-    <div style={{maxWidth:720}}>
+    <div style={{width:"100%"}}>
       <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,marginBottom:6,color:T.dark}}>Controls Reference</div>
       <p style={{color:T.muted,fontSize:13,marginBottom:28,lineHeight:1.6}}>All keyboard shortcuts and interaction patterns in one place.</p>
 
-      <Sec title="PLACING DESKS">
-        <KRow keys={["Click canvas"]} desc="Place a new desk at that position"/>
-        <KRow keys={["Drag desk"]} desc="Reposition the desk"/>
-        <KRow keys={["+ / − on desk"]} desc="Increase or decrease how many students can sit at that table"/>
-        <KRow keys={["Right-click desk"]} desc="Context menu: delete, copy, duplicate"/>
-        <KRow keys={["Click canvas (Formation dropdown)"]} desc="Insert a preset group of desks centered on canvas"/>
-        <KRow keys={["Shape picker (toolbar)"]} desc="Select desk shape before clicking to place"/>
-      </Sec>
+      <div className="controls-grid">
+        <Sec title="PLACING DESKS">
+          <KRow keys={["Click canvas"]} desc="Place a new desk at that position"/>
+          <KRow keys={["Drag desk"]} desc="Reposition the desk"/>
+          <KRow keys={["+ / − on desk"]} desc="Increase or decrease how many students can sit at that table"/>
+          <KRow keys={["Right-click desk"]} desc="Context menu: delete, copy, duplicate"/>
+          <KRow keys={["Click canvas (Formation dropdown)"]} desc="Insert a preset group of desks centered on canvas"/>
+          <KRow keys={["Shape picker (toolbar)"]} desc="Select desk shape before clicking to place"/>
+        </Sec>
 
-      <Sec title="SELECTION">
-        <KRow keys={["Click desk"]} desc="Select desk (deselects others)"/>
-        <KRow keys={["Shift + Click"]} desc="Add/remove desk from selection"/>
-        <KRow keys={["Drag empty canvas"]} desc="Lasso-select all desks in rectangle"/>
-        <KRow keys={["Ctrl+A"]} desc="Select all desks"/>
-        <KRow keys={["Escape"]} desc="Deselect all"/>
-      </Sec>
+        <Sec title="SELECTION">
+          <KRow keys={["Click desk"]} desc="Select desk (deselects others)"/>
+          <KRow keys={["Shift + Click"]} desc="Add/remove desk from selection"/>
+          <KRow keys={["Drag empty canvas"]} desc="Lasso-select all desks in rectangle"/>
+          <KRow keys={["Ctrl+A"]} desc="Select all desks"/>
+          <KRow keys={["Escape"]} desc="Deselect all"/>
+        </Sec>
 
-      <Sec title="EDITING">
-        <KRow keys={["Ctrl+Z"]} desc="Undo"/>
-        <KRow keys={["Ctrl+Y","Ctrl+Shift+Z"]} desc="Redo"/>
-        <KRow keys={["Delete","Backspace"]} desc="Delete selected desks"/>
-        <KRow keys={["Ctrl+C"]} desc="Copy selected desks"/>
-        <KRow keys={["Ctrl+V"]} desc="Paste copied desks (offset from original)"/>
-        <KRow keys={["Ctrl+D"]} desc="Duplicate selected desks"/>
-        <KRow keys={["↑ ↓ ← →"]} desc="Nudge selected desks by 1px"/>
-        <KRow keys={["Shift + Arrows"]} desc="Nudge by 10px"/>
-        <KRow keys={["R"]} desc="Rotate selected desks +15°"/>
-        <KRow keys={["Shift+R"]} desc="Rotate selected desks −15°"/>
-        <KRow keys={["Rotation slider"]} desc="Fine-tune rotation (appears in toolbar when desks are selected)"/>
-      </Sec>
+        <Sec title="EDITING">
+          <KRow keys={["Ctrl+Z"]} desc="Undo"/>
+          <KRow keys={["Ctrl+Y","Ctrl+Shift+Z"]} desc="Redo"/>
+          <KRow keys={["Delete","Backspace"]} desc="Delete selected desks"/>
+          <KRow keys={["Ctrl+C"]} desc="Copy selected desks"/>
+          <KRow keys={["Ctrl+V"]} desc="Paste copied desks (offset from original)"/>
+          <KRow keys={["Ctrl+D"]} desc="Duplicate selected desks"/>
+          <KRow keys={["↑ ↓ ← →"]} desc="Nudge selected desks by 1px"/>
+          <KRow keys={["Shift + Arrows"]} desc="Nudge by 10px"/>
+          <KRow keys={["R"]} desc="Rotate selected desks +15°"/>
+          <KRow keys={["Shift+R"]} desc="Rotate selected desks −15°"/>
+          <KRow keys={["Rotation slider"]} desc="Fine-tune rotation (appears in toolbar when desks are selected)"/>
+        </Sec>
 
-      <Sec title="ROOM SHAPE">
-        <KRow keys={["Room preset buttons"]} desc="Apply a preset polygon (Rectangle, L, T, Hexagon, Octagon)"/>
-        <KRow keys={["Edit vertices"]} desc="Enter vertex-drag mode to reshape the room freely"/>
-        <KRow keys={["Drag orange handle"]} desc="Move a polygon vertex (snaps to grid if Snap is on)"/>
-        <KRow keys={["+ Point / − Point"]} desc="Add or remove a vertex from the polygon"/>
-      </Sec>
+        <Sec title="ROOM SHAPE">
+          <KRow keys={["Room preset buttons"]} desc="Apply a preset polygon (Rectangle, L, T, Hexagon, Octagon)"/>
+          <KRow keys={["Edit vertices"]} desc="Enter vertex-drag mode to reshape the room freely"/>
+          <KRow keys={["Drag handle"]} desc="Move a polygon vertex (snaps to grid if Snap is on)"/>
+          <KRow keys={["+ Point / − Point"]} desc="Add or remove a vertex from the polygon"/>
+        </Sec>
 
-      <Sec title="RANDOMIZE (Randomize tab)">
-        <KRow keys={["Randomize"]} desc="Run SA optimizer to assign all students to seats"/>
-        <KRow keys={["Present"]} desc="Open a fullscreen seating chart for screen sharing or classroom display"/>
-        <KRow keys={["Lock chips","Desk lock"]} desc="Keep selected students in their current seats on the next randomize"/>
-        <KRow keys={["Click two desks"]} desc="After randomizing, click two seats to swap their students"/>
-        <KRow keys={["Clear"]} desc="Clear the randomized result and start over"/>
-      </Sec>
+        <Sec title="RANDOMIZE (Randomize tab)">
+          <KRow keys={["Randomize"]} desc="Run SA optimizer to assign all students to seats"/>
+          <KRow keys={["Present"]} desc="Open a fullscreen seating chart for screen sharing or classroom display"/>
+          <KRow keys={["Lock chips","Desk lock"]} desc="Keep selected students in their current seats on the next randomize"/>
+          <KRow keys={["Click two desks"]} desc="After randomizing, click two seats to swap their students"/>
+          <KRow keys={["Clear"]} desc="Clear the randomized result and start over"/>
+        </Sec>
 
-      <Sec title="SNAP TO GRID">
-        <p style={{fontSize:13,color:T.dark,lineHeight:1.7,padding:"9px 0",borderBottom:`1px solid ${T.border}`}}>
-          Toggle "Snap {GRID_SZ}px" in the toolbar. When on: desk placement snaps to the {GRID_SZ}px dot-grid,
-          rotation snaps to {ROT_SNAP}° increments, and room polygon vertices snap to the same grid.
-        </p>
-      </Sec>
+        <Sec title="SNAP TO GRID">
+          <p style={{fontSize:13,color:T.dark,lineHeight:1.7,padding:"9px 0",borderBottom:`1px solid ${T.border}`}}>
+            Toggle "Snap {GRID_SZ}px" in the toolbar. When on: desk placement snaps to the {GRID_SZ}px dot-grid,
+            rotation snaps to {ROT_SNAP}° increments, and room polygon vertices snap to the same grid.
+          </p>
+        </Sec>
 
-      {/* Shape gallery */}
-      <Sec title="DESK SHAPES">
-        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-          {DESK_SHAPES.map(sh=>(
-            <div key={sh.id} style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:10,
-              padding:"14px 20px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,minWidth:90}}>
-              <span style={{fontSize:26}}>{sh.icon}</span>
-              <span style={{fontSize:11,fontWeight:500,color:T.dark}}>{sh.label}</span>
-              <span style={{fontSize:9,color:T.muted}}>{sh.isHex?"SVG hex":sh.baseRot?`base ${sh.baseRot}°`:`${sh.bRadius} radius`}</span>
-            </div>
-          ))}
-        </div>
-      </Sec>
+        {/* Shape gallery */}
+        <Sec title="DESK SHAPES">
+          <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+            {DESK_SHAPES.map(sh=>(
+              <div key={sh.id} style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:10,
+                padding:"14px 20px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,minWidth:90}}>
+                <span style={{fontSize:26}}>{sh.icon}</span>
+                <span style={{fontSize:11,fontWeight:500,color:T.dark}}>{sh.label}</span>
+                <span style={{fontSize:9,color:T.muted}}>{sh.isHex?"SVG hex":sh.baseRot?`base ${sh.baseRot}°`:`${sh.bRadius} radius`}</span>
+              </div>
+            ))}
+          </div>
+        </Sec>
 
-      {/* Formation gallery */}
-      <Sec title="FORMATION PRESETS">
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8}}>
-          {["Pods","Rows","U-Tables","Rings","Grids"].map(cat=>(
-            <div key={cat}>
-              <div style={{fontSize:9,letterSpacing:1,color:T.muted,marginBottom:5}}>{cat.toUpperCase()}</div>
-              {TABLE_PRESETS.filter(p=>p.cat===cat).map(p=>(
-                <div key={p.id} style={{background:T.panel,border:`1px solid ${T.border}`,
-                  borderRadius:6,padding:"5px 10px",fontSize:11,marginBottom:4,color:T.dark}}>{p.label}</div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </Sec>
+        {/* Formation gallery */}
+        <Sec title="FORMATION PRESETS">
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8}}>
+            {["Pods","Rows","U-Tables","Rings","Grids"].map(cat=>(
+              <div key={cat}>
+                <div style={{fontSize:9,letterSpacing:1,color:T.muted,marginBottom:5}}>{cat.toUpperCase()}</div>
+                {TABLE_PRESETS.filter(p=>p.cat===cat).map(p=>(
+                  <div key={p.id} style={{background:T.panel,border:`1px solid ${T.border}`,
+                    borderRadius:6,padding:"5px 10px",fontSize:11,marginBottom:4,color:T.dark}}>{p.label}</div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Sec>
+      </div>
     </div>
   );
 }
