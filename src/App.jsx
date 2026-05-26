@@ -527,7 +527,7 @@ function LoginPage({onLogin}) {
       <div className="login-card" style={{width:360,background:T.panel,borderRadius:16,
         border:`1px solid ${T.border}`,padding:"40px 36px",boxShadow:"0 8px 32px rgba(0,0,0,.1)"}}>
         <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:30,color:T.dark,marginBottom:4}}>SeatCraft</div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:300,color:T.dark,marginBottom:4}}>SeatCraft</div>
           <div style={{fontSize:10,letterSpacing:3,color:T.muted}}>CLASSROOM SEATING</div>
         </div>
         <div style={{display:"flex",background:T.bg,borderRadius:8,padding:3,marginBottom:26}}>
