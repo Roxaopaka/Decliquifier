@@ -1312,7 +1312,7 @@ function LayoutTab({cls,upd}) {
 //   • Scale changes W/H → wrapper grows/shrinks, visual matches, position stays centred ✓
 //   • Rotation only affects the visual layer → text always stays horizontal ✓
 //   • Hex uses SVG visual for clean stroke (clip-path would clip the border) ✓
-function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,students,meta,allGrades,readonly,onMD,onHov,onCtx,onCapacityChange,onLock}) {
+function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,students,meta,allGrades,readonly,onMD,onHov,onCtx,onCapacityChange,onLock,onStudentClick,activeStudentKey}) {
   const sh  = getShape(seat.shape);
   const sc  = seat.scale ?? 1;
   const W   = sh.w * sc;          // scaled width
@@ -1365,13 +1365,22 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
           {assignedStudents.map((name,i) => {
             const m = Array.isArray(meta) ? (meta[i] ?? {}) : primaryMeta;
             const bg = m.grade ? gradeColor(m.grade, allGrades, T) : "transparent";
-            return (
-              <span key={`${name}-${i}`} style={{display:"block",whiteSpace:"nowrap",overflow:"hidden",
-                textOverflow:"ellipsis",maxWidth:W-8,borderRadius:999,padding:m.grade?"2px 6px":"0 2px",
-                background:bg,color:m.grade?gradeTextColor(m.grade):"#fff",
-                boxShadow:m.grade?"0 1px 3px rgba(0,0,0,.18)":"none"}}>
+            const active=activeStudentKey===`${seat.id}::${i}`;
+            const chipStyle={display:"block",whiteSpace:"nowrap",overflow:"hidden",
+              textOverflow:"ellipsis",maxWidth:W-8,borderRadius:999,padding:m.grade?"2px 6px":"1px 4px",
+              background:active?T.sel:bg,color:active?"#fff":(m.grade?gradeTextColor(m.grade):"#fff"),
+              boxShadow:active?`0 0 0 2px #fff, 0 0 0 4px ${T.sel}`:(m.grade?"0 1px 3px rgba(0,0,0,.18)":"none"),
+              border:"none",font:"inherit",lineHeight:1.2};
+            return onStudentClick ? (
+              <button key={`${name}-${i}`} type="button"
+                onMouseDown={e=>{e.preventDefault();e.stopPropagation();}}
+                onClick={e=>{e.stopPropagation();onStudentClick(seat.id,i);}}
+                title="Click to select this student for swapping"
+                style={{...chipStyle,pointerEvents:"auto",cursor:"pointer"}}>
                 {name}
-              </span>
+              </button>
+            ) : (
+              <span key={`${name}-${i}`} style={chipStyle}>{name}</span>
             );
           })}
         </span>
@@ -1881,7 +1890,7 @@ function RandomizeTab({cls}) {
   const [running,setRunning]=useState(false);
   const [showR,setShowR]=useState(true);
   const [hov,setHov]=useState(null);
-  const [swapping,setSwapping]=useState(null); // seatId being moved
+  const [swapping,setSwapping]=useState(null); // {seatId, studentIndex} being moved
   const [locked,setLocked]=useState(()=>new Set());
   const [presenting,setPresenting]=useState(false);
 
@@ -1919,12 +1928,27 @@ function RandomizeTab({cls}) {
     });
   };
 
-  // Manual swap: click two desks to swap the student group assigned to each table.
-  const handleSeatClick=sid=>{
+  // Manual swap: click two individual student chips to swap only those students.
+  const handleStudentClick=(seatId,studentIndex)=>{
     if(!result)return;
-    if(swapping===null){setSwapping(sid);}
-    else if(swapping===sid){setSwapping(null);}
-    else{setResult(r=>({...r,[sid]:r[swapping],[swapping]:r[sid]}));setSwapping(null);}
+    const assigned=assignedStudentsFor(result,seatId);
+    if(!assigned[studentIndex])return;
+    if(swapping===null){setSwapping({seatId,studentIndex});}
+    else if(swapping.seatId===seatId&&swapping.studentIndex===studentIndex){setSwapping(null);}
+    else{
+      setResult(r=>{
+        const next={...r};
+        const a=[...assignedStudentsFor(next,swapping.seatId)];
+        const b=[...assignedStudentsFor(next,seatId)];
+        const tmp=a[swapping.studentIndex];
+        a[swapping.studentIndex]=b[studentIndex];
+        b[studentIndex]=tmp;
+        next[swapping.seatId]=a;
+        next[seatId]=b;
+        return next;
+      });
+      setSwapping(null);
+    }
   };
   const openPresenter=()=>{
     setPresenting(true);
@@ -1983,8 +2007,8 @@ function RandomizeTab({cls}) {
           border:`1px solid ${T.border}`,padding:"8px 14px",display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
           <span>↕ Swap mode:</span>
           {swapping===null
-            ?<span>Click a desk to pick up its student</span>
-            :<span style={{color:T.accent,fontWeight:500}}>Now click another desk to swap — or click same desk to cancel</span>}
+            ?<span>Click one student name, then another student name to swap them</span>
+            :<span style={{color:T.accent,fontWeight:500}}>Now click another student to swap — or click the same student to cancel</span>}
         </div>
       )}
 
@@ -2038,8 +2062,8 @@ function RandomizeTab({cls}) {
             <div style={{position:"absolute",inset:0,clipPath:polyToClip(layout.roomPoly??DEFAULT_ROOM())}}>
               {seats.map(seat=>{
                 const assigned=result?assignedStudentsFor(result,seat.id):[];
-                const isSwapSrc=swapping===seat.id;
-                const isSwapTarget=swapping!==null&&swapping!==seat.id&&assigned.length>0;
+                const isSwapSrc=swapping?.seatId===seat.id;
+                const isSwapTarget=swapping!==null&&swapping.seatId!==seat.id&&assigned.length>0;
                 const isLocked=assigned.some(stu=>validLocked.has(stu));
                 return (
                   <DeskBody key={seat.id} seat={seat} theme={T} isLocked={isLocked}
@@ -2047,8 +2071,10 @@ function RandomizeTab({cls}) {
                     isHovered={hov?.id===seat.id||isSwapTarget}
                     students={assigned} meta={assigned.map(stu=>studentMeta[stu]??{})} allGrades={allGrades}
                     readonly={false}
-                    onMD={(e,sid)=>{e.preventDefault();if(result)handleSeatClick(sid);}}
-                    onHov={setHov} onCtx={()=>{}} onLock={lockDesk}/>
+                    onMD={e=>{e.preventDefault();}}
+                    onHov={setHov} onCtx={()=>{}} onLock={lockDesk}
+                    onStudentClick={result?handleStudentClick:null}
+                    activeStudentKey={swapping?`${swapping.seatId}::${swapping.studentIndex}`:null}/>
                 );
               })}
             </div>
