@@ -506,6 +506,22 @@ function LoginField({label,type,value,onChange,onEnter,placeholder}) {
   );
 }
 
+function SeatCraftLogo({size=34,color="currentColor",style={}}) {
+  return (
+    <svg viewBox="0 0 72 72" aria-hidden="true" focusable="false"
+      style={{width:size,height:size,display:"block",color,...style}}>
+      <g fill="none" stroke="currentColor" strokeWidth={5.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M24 58 L29 33"/>
+        <path d="M48 58 V36"/>
+        <path d="M63 58 L60 36"/>
+        <path d="M27 34 H59 Q66 34 66 40 Q66 46 59 46 H26"/>
+        <path d="M30 33 L22 12 Q21 8 25 6 Q39 1 52 8 Q61 13 63 25 Q64 29 64 34"/>
+        <path d="M23 13 Q39 22 32 46"/>
+      </g>
+    </svg>
+  );
+}
+
 function LoginPage({onLogin}) {
   const T=useT();
   const [mode,setMode]  = useState("login");
@@ -542,7 +558,10 @@ function LoginPage({onLogin}) {
       <div className="login-card" style={{width:360,background:T.panel,borderRadius:16,
         border:`1px solid ${T.border}`,padding:"40px 36px",boxShadow:"0 8px 32px rgba(0,0,0,.1)"}}>
         <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:30,color:T.dark,marginBottom:4}}>SeatCraft</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:4}}>
+            <SeatCraftLogo size={42} color={T.accent}/>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:30,color:T.dark}}>SeatCraft</div>
+          </div>
           <div style={{fontSize:10,letterSpacing:3,color:T.muted}}>CLASSROOM SEATING</div>
         </div>
         <div style={{display:"flex",background:T.bg,borderRadius:8,padding:3,marginBottom:26}}>
@@ -667,7 +686,10 @@ export default function App() {
       <div className="app-shell">
         {/* Sidebar */}
         <aside className="app-sidebar">
-          <div style={{fontFamily:"'Barlow Condensed',serif",fontSize:21,marginBottom:2}}>SeatCraft</div>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+            <SeatCraftLogo size={30} color={T.isDark?T.accent:T.sidebarText}/>
+            <div style={{fontFamily:"'Barlow Condensed',serif",fontSize:21,lineHeight:1}}>SeatCraft</div>
+          </div>
           <div style={{fontSize:9,letterSpacing:2,opacity:.3,marginBottom:8}}>CLASSROOM SEATING</div>
           <div style={{fontSize:10,color:T.sidebarMuted,marginBottom:18,overflow:"hidden",
             textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={teacher}>{teacher}</div>
