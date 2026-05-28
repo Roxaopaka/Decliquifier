@@ -87,11 +87,11 @@ const DRAG_THR = 5;
 const ROT_SNAP = 15; // degrees — rotation snap increment when grid is on
 const GRADE_LEVELS = ["6","7","8","9","10","11","12"];
 const MENTAL_CAPACITY_LEVELS = [
-  {value:"1", label:"1 Developing"},
-  {value:"2", label:"2 Emerging"},
-  {value:"3", label:"3 Steady"},
-  {value:"4", label:"4 Strong"},
-  {value:"5", label:"5 Advanced"},
+  {value:"1", label:"1 Unfocused"},
+  {value:"2", label:"2 Slightly focused"},
+  {value:"3", label:"3 Kind of Focused"},
+  {value:"4", label:"4 Focused"},
+  {value:"5", label:"5 Very Focused"},
 ];
 const seatCapacity = seat => Math.max(1, Math.floor(Number(seat?.capacity ?? 1) || 1));
 const mkSeat = props => ({capacity:1,...props});
@@ -2220,7 +2220,7 @@ function RandomizeTab({cls,upd}) {
   const active=[
     settings.separateGenders&&`Gender (w=${settings.genderWeight})`,
     settings.mixGrades&&`Grade mix (w=${settings.gradeWeight})`,
-    settings.mixMentalCapacity&&`Mental capacity ${settings.mentalMixMode==="homogeneous"?"homogeneous":"heterogeneous"} (w=${settings.mentalCapacityWeight})`,
+    settings.mixMentalCapacity&&`Focus Level ${settings.mentalMixMode==="homogeneous"?"homogeneous":"heterogeneous"} (w=${settings.mentalCapacityWeight})`,
   ].filter(Boolean);
 
   return (
@@ -2482,7 +2482,7 @@ function SettingsTab({cls,upd}) {
     ["Neighbor radius",`${s.proximityRadius??120}px`],
     ["Gender separation",s.separateGenders?`On · ${s.genderWeight??50}`:"Off"],
     ["Grade mixing",s.mixGrades?`On · ${s.gradeWeight??50}`:"Off"],
-    ["Mental capacity",s.mixMentalCapacity?`${s.mentalMixMode==="homogeneous"?"Homogeneous":"Heterogeneous"} · ${s.mentalCapacityWeight??50}`:"Off"],
+    ["Focus Level",s.mixMentalCapacity?`${s.mentalMixMode==="homogeneous"?"Homogeneous":"Heterogeneous"} · ${s.mentalCapacityWeight??50}`:"Off"],
   ];
   return (//s
     <div className="settings-shell">
@@ -2503,9 +2503,9 @@ function SettingsTab({cls,upd}) {
           <Toggle f="mixGrades" label="Encourage grade mixing"/>
         </Row>
         {s.mixGrades&&<Row label="Grade mixing weight" desc="Extra penalty per same-grade pair."><Slider f="gradeWeight" min={0} max={150} step={5}/></Row>}
-        <Sec t="MENTAL CAPACITY"/>
-        <Row label="Mix by mental capacity" desc="Uses each student's 1-5 mental capacity from the Students tab.">
-          <Toggle f="mixMentalCapacity" label="Enable mental capacity mixing"/>
+        <Sec t="FOCUS LEVEL"/>
+        <Row label="Mix by focus level" desc="Uses each student's 1-5 focus level from the Students tab.">
+          <Toggle f="mixMentalCapacity" label="Enable mixing by focus level"/>
         </Row>
         {s.mixMentalCapacity&&<>
           <Row label="Mixing style" desc="Homogeneous seats similar capacity nearby. Heterogeneous seats different capacity nearby.">
@@ -2515,7 +2515,7 @@ function SettingsTab({cls,upd}) {
               <option value="heterogeneous">Heterogeneous Mixing</option>
             </select>
           </Row>
-          <Row label="Mental capacity weight" desc="Extra penalty when nearby students do not match the selected mixing style.">
+          <Row label="Focus Level Weight" desc="Extra penalty when nearby students do not match the selected mixing style.">
             <Slider f="mentalCapacityWeight" min={0} max={150} step={5}/>
           </Row>
         </>}
