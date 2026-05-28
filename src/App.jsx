@@ -1759,7 +1759,7 @@ function StudentsTab({cls,upd}) {
   return (
     <div style={{width:"100%"}}>
       <p style={{color:T.muted,fontSize:13,marginBottom:14,lineHeight:1.6}}>
-        One student per line. Set gender, grade, and mental capacity below for randomization constraints.
+        One student per line. Set gender, grade, and focus level below for randomization constraints.
       </p>
       <div className="students-shell">
         <div className="student-editor">
@@ -1785,7 +1785,7 @@ function StudentsTab({cls,upd}) {
         </div>
         {cls.students.length>0&&(
           <div className="student-meta-panel">
-            <div style={{fontSize:9,letterSpacing:2,marginBottom:6,color:T.muted}}>GENDER, GRADE & MENTAL CAPACITY</div>
+            <div style={{fontSize:9,letterSpacing:2,marginBottom:6,color:T.muted}}>GENDER, GRADE & FOCUS LEVEL</div>
             <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:280,overflowY:"auto"}}>
               {cls.students.map(name=>{
                 const m=meta[name]??{};
@@ -1808,7 +1808,7 @@ function StudentsTab({cls,upd}) {
                     </select>
                     <select value={m.mentalCapacity??""} onChange={e=>setM(name,"mentalCapacity",e.target.value)}
                       style={{width:138,border:`1px solid ${T.border}`,borderRadius:5,padding:"3px 6px",fontSize:11,outline:"none",color:T.dark,background:T.panel,cursor:"pointer"}}>
-                      <option value="">Mental capacity</option>
+                      <option value="">Focus Level</option>
                       {MENTAL_CAPACITY_LEVELS.map(l=><option key={l.value} value={l.value}>{l.label}</option>)}
                     </select>
                   </div>
@@ -1846,7 +1846,7 @@ function StudentsTab({cls,upd}) {
                 </div>
               </div>
               <div style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",gridColumn:"1 / -1"}}>
-                <div style={{fontSize:9,letterSpacing:1.5,color:T.muted,marginBottom:4}}>WITH MENTAL CAPACITY</div>
+                <div style={{fontSize:9,letterSpacing:1.5,color:T.muted,marginBottom:4}}>WITH FOCUS LEVEL</div>
                 <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:T.dark}}>
                   {cls.students.filter(s=>mentalCapacityValue(cls.studentMeta?.[s])!==null).length}
                 </div>
@@ -2253,7 +2253,7 @@ function RandomizeTab({cls,upd}) {
         <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:T.dark,userSelect:"none"}}>
           <input type="checkbox" checked={settings.mixMentalCapacity??false}
             onChange={e=>setSetting("mixMentalCapacity",e.target.checked)}/>
-          Mix by mental capacity
+          Mix by Focus Level
         </label>
         <select value={settings.mentalMixMode??"heterogeneous"} disabled={!settings.mixMentalCapacity}
           onChange={e=>setSetting("mentalMixMode",e.target.value)}
