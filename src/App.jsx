@@ -86,6 +86,13 @@ const GRID_SZ  = 28;
 const DRAG_THR = 5;
 const ROT_SNAP = 15; // degrees — rotation snap increment when grid is on
 const GRADE_LEVELS = ["6","7","8","9","10","11","12"];
+const MENTAL_CAPACITY_LEVELS = [
+  {value:"1", label:"1 Developing"},
+  {value:"2", label:"2 Emerging"},
+  {value:"3", label:"3 Steady"},
+  {value:"4", label:"4 Strong"},
+  {value:"5", label:"5 Advanced"},
+];
 const seatCapacity = seat => Math.max(1, Math.floor(Number(seat?.capacity ?? 1) || 1));
 const mkSeat = props => ({capacity:1,...props});
 
@@ -112,6 +119,28 @@ const assignedStudentsFor = (result, seatId) => {
   const value = result?.[seatId];
   if(Array.isArray(value)) return value;
   return value ? [value] : [];
+};
+const mentalCapacityValue = meta => {
+  const n = Number(meta?.mentalCapacity);
+  return Number.isFinite(n) && n >= 1 && n <= 5 ? n : null;
+};
+const seatedTogetherPairs = (result,seats,r) => {
+  if(!result) return [];
+  const positioned=[];
+  seats.forEach(seat=>{
+    assignedStudentsFor(result,seat.id).forEach(student=>positioned.push({student,seat}));
+  });
+  const pairs=[];
+  for(let i=0;i<positioned.length;i++) for(let j=i+1;j<positioned.length;j++){
+    const a=positioned[i],b=positioned[j];
+    if(a.seat.id===b.seat.id||edist(a.seat,b.seat)<=r) pairs.push(pairKey(a.student,b.student));
+  }
+  return pairs;
+};
+const addSitTogetherCounts = (counts,pairs) => {
+  const next={...(counts??{})};
+  pairs.forEach(k=>{next[k]=(next[k]??0)+1;});
+  return next;
 };
 
 // ─── desk shapes ──────────────────────────────────────────────────────────────
@@ -190,8 +219,17 @@ const polyToClip = poly=>`polygon(${poly.map(p=>`${p.x}px ${p.y}px`).join(", ")}
 
 // ─── data factories ───────────────────────────────────────────────────────────
 const mkClass = name=>({
-  id:uid(),name,students:[],studentMeta:{},layouts:{},chemistry:{},activeLayoutId:null,
-  settings:{proximityRadius:120,separateGenders:false,genderWeight:50,mixGrades:false,gradeWeight:50},
+  id:uid(),name,students:[],studentMeta:{},layouts:{},chemistry:{},activeLayoutId:null,sitTogether:{},
+  settings:{
+    proximityRadius:120,
+    separateGenders:false,
+    genderWeight:50,
+    mixGrades:false,
+    gradeWeight:50,
+    mixMentalCapacity:false,
+    mentalMixMode:"heterogeneous",
+    mentalCapacityWeight:50,
+  },
 });
 const mkLayout = name=>({id:uid(),name,seats:[],roomPoly:DEFAULT_ROOM()});
 const cloneSeatsForLayout = seats => (seats??[]).map(seat=>mkSeat({
@@ -226,6 +264,14 @@ function scoreFn(asgn,seats,chem,r,studentMeta={},settings={}) {
     const mA=studentMeta?.[sa]??{},mB=studentMeta?.[sb]??{};
     if(settings?.separateGenders&&mA.gender&&mB.gender&&mA.gender===mB.gender) p+=settings.genderWeight??50;
     if(settings?.mixGrades&&mA.grade&&mB.grade&&mA.grade===mB.grade) p+=settings.gradeWeight??50;
+    if(settings?.mixMentalCapacity){
+      const capA=mentalCapacityValue(mA),capB=mentalCapacityValue(mB);
+      if(capA!==null&&capB!==null){
+        const diff=Math.abs(capA-capB);
+        const weight=settings.mentalCapacityWeight??50;
+        p+=(settings.mentalMixMode==="homogeneous" ? diff/4 : (4-diff)/4) * weight;
+      }
+    }
   }
   return p;
 }
@@ -275,18 +321,18 @@ const PAL = {
 };
 const LIGHT = {
   // Palette-led light mode: cool slate chrome, pale mist surfaces, and olive/sage accents.
-  bg:"#E0E0E0",
+  bg:"#FFFFFF",
   sidebar:"#3A606E",
   sidebarText:"#F4F7F6",
   sidebarMuted:"rgba(244,247,246,.58)",
   sidebarSubtle:"rgba(224,224,224,.14)",
-  canvas:"#F7F8F5",
+  canvas:"#FAFBF8",
   panel:"#FFFFFF",
   dark:"#233B43",
   accent:"#607B7D",
   accentLt:"#EEF1EA",
   border:"#C9D0C7",
-  muted:"#607B7D",
+  muted:"#4F666A",
   chip:"#DDE0D3",
   sel:"#3A606E",
   selLt:"rgba(58,96,110,.13)",
@@ -362,7 +408,11 @@ const mkStyles = T => `
   input,select,textarea{font-family:'DM Sans',sans-serif}
   /* Range and checkbox controls borrow the current theme accent, which makes
      sliders, toggles, and randomized chemistry controls feel connected. */
-  input[type=range]{accent-color:${T.accent};cursor:pointer;width:100%}
+  input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;accent-color:${T.accent};cursor:pointer;width:100%;height:28px;touch-action:none}
+  input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:999px;background:${T.border}}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:${T.accent};border:2px solid ${T.panel};box-shadow:0 1px 5px rgba(0,0,0,.25);margin-top:-6px}
+  input[type=range]::-moz-range-track{height:6px;border-radius:999px;background:${T.border}}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:${T.accent};border:2px solid ${T.panel};box-shadow:0 1px 5px rgba(0,0,0,.25)}
   input[type=checkbox]{accent-color:${T.accent};cursor:pointer}
   /* Native selects keep their accessibility behavior but use a small custom
      chevron so grade/layout dropdowns match the rest of the app. */
@@ -803,7 +853,7 @@ function EmptyState({onAdd}) {
   return (
     <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,height:"100%"}}>
       <div style={{fontSize:52,opacity:.1}}>🪑</div>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,opacity:.35,color:T.dark}}>No class selected</div>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:T.muted}}>No class selected</div>
       <ABtn onClick={onAdd}>Create your first class</ABtn>
     </div>
   );
@@ -832,7 +882,7 @@ function ClassView({cls,tab,setTab,upd,savedLayouts,setSavedLayouts}) {
         {tab==="layout"    &&<LayoutTab    cls={cls} upd={upd} savedLayouts={savedLayouts} setSavedLayouts={setSavedLayouts}/>}
         {tab==="students"  &&<StudentsTab  cls={cls} upd={upd}/>}
         {tab==="chemistry" &&<ChemistryTab cls={cls} upd={upd}/>}
-        {tab==="randomize" &&<RandomizeTab cls={cls}/>}
+        {tab==="randomize" &&<RandomizeTab cls={cls} upd={upd}/>}
         {tab==="settings"  &&<SettingsTab  cls={cls} upd={upd}/>}
         {tab==="controls"  &&<ControlsTab/>}
       </div>
@@ -1118,7 +1168,7 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
       {/* Layout list: narrow left rail keeps layout switching separate from the
           canvas tools, using bordered rows that mirror the class list pattern. */}
       <div className="layout-rail">
-        <div style={{fontSize:9,letterSpacing:2,opacity:.35,marginBottom:10,color:T.dark}}>LAYOUTS</div>
+        <div style={{fontSize:9,letterSpacing:2,marginBottom:10,color:T.muted}}>LAYOUTS</div>
         <div style={{display:"flex",flexDirection:"column",gap:5}}>
           {layouts.map(l=>(
             <div key={l.id} onClick={()=>upd(c=>({...c,activeLayoutId:l.id}))}
@@ -1131,7 +1181,7 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
               <button onClick={e=>{e.stopPropagation();delLyt(l.id);}} style={{background:"none",border:"none",opacity:.3,fontSize:17,padding:0,lineHeight:1,color:T.dark}}>×</button>
             </div>
           ))}
-          {!layouts.length&&<div style={{fontSize:12,opacity:.35,color:T.dark}}>No layouts yet</div>}
+          {!layouts.length&&<div style={{fontSize:12,color:T.muted}}>No layouts yet</div>}
           {addingLyt?(
             <div style={{display:"flex",gap:4}}>
               <input ref={addLytRef} value={newLytName} onChange={e=>setLytNm(e.target.value)}
@@ -1229,6 +1279,7 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
                   <input type="range" min={-180} max={180} step={snapOn?ROT_SNAP:1}
                     value={commonRot}
                     onChange={e=>{const t=+e.target.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,rotation:t}:d));}}
+                    onInput={e=>{const t=+e.currentTarget.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,rotation:t}:d));}}
                     style={{width:130,cursor:"pointer"}}/>
                   <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,minWidth:36,color:T.dark}}>{commonRot}°</span>
                   <button onClick={()=>rotateSel(90)}
@@ -1244,6 +1295,7 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
                   <input type="range" min={0.4} max={2.5} step={0.05}
                     value={commonScale}
                     onChange={e=>{const t=+e.target.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:t}:d));}}
+                    onInput={e=>{const t=+e.currentTarget.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:t}:d));}}
                     style={{width:130,cursor:"pointer"}}/>
                   <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,minWidth:36,color:T.dark}}>×{commonScale.toFixed(1)}</span>
                   <button onClick={()=>applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:1}:d))}
@@ -1707,11 +1759,11 @@ function StudentsTab({cls,upd}) {
   return (
     <div style={{width:"100%"}}>
       <p style={{color:T.muted,fontSize:13,marginBottom:14,lineHeight:1.6}}>
-        One student per line. Set gender and grade below for randomization constraints.
+        One student per line. Set gender, grade, and mental capacity below for randomization constraints.
       </p>
       <div className="students-shell">
         <div className="student-editor">
-          <div style={{fontSize:9,letterSpacing:2,opacity:.35,marginBottom:6,color:T.dark}}>STUDENT NAMES</div>
+          <div style={{fontSize:9,letterSpacing:2,marginBottom:6,color:T.muted}}>STUDENT NAMES</div>
           <textarea value={raw} onChange={e=>setRaw(e.target.value)}
             placeholder={"Alice Johnson\nBob Smith\nCarla Davis\n..."}
             style={{width:"100%",height:220,border:`1px solid ${T.border}`,borderRadius:8,padding:14,
@@ -1733,13 +1785,13 @@ function StudentsTab({cls,upd}) {
         </div>
         {cls.students.length>0&&(
           <div className="student-meta-panel">
-            <div style={{fontSize:9,letterSpacing:2,opacity:.35,marginBottom:6,color:T.dark}}>GENDER & GRADE</div>
+            <div style={{fontSize:9,letterSpacing:2,marginBottom:6,color:T.muted}}>GENDER, GRADE & MENTAL CAPACITY</div>
             <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:280,overflowY:"auto"}}>
               {cls.students.map(name=>{
                 const m=meta[name]??{};
                 return (
-                  <div key={name} style={{display:"flex",alignItems:"center",gap:8,background:T.panel,border:`1px solid ${T.border}`,borderRadius:7,padding:"6px 10px"}}>
-                    <span style={{fontSize:12,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:T.dark}}>{name}</span>
+                  <div key={name} style={{display:"flex",alignItems:"center",gap:8,background:T.panel,border:`1px solid ${T.border}`,borderRadius:7,padding:"6px 10px",flexWrap:"wrap"}}>
+                    <span style={{fontSize:12,flex:"1 1 120px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:T.dark}}>{name}</span>
                     <div style={{display:"flex",gap:2}}>
                       {[["M","M"],["F","F"],["X","X"],["","—"]].map(([val,lbl])=>(
                         <button key={val} onClick={()=>setM(name,"gender",val)}
@@ -1754,6 +1806,11 @@ function StudentsTab({cls,upd}) {
                       <option value="">Grade</option>
                       {GRADE_LEVELS.map(g=><option key={g} value={g}>{g}</option>)}
                     </select>
+                    <select value={m.mentalCapacity??""} onChange={e=>setM(name,"mentalCapacity",e.target.value)}
+                      style={{width:138,border:`1px solid ${T.border}`,borderRadius:5,padding:"3px 6px",fontSize:11,outline:"none",color:T.dark,background:T.panel,cursor:"pointer"}}>
+                      <option value="">Mental capacity</option>
+                      {MENTAL_CAPACITY_LEVELS.map(l=><option key={l.value} value={l.value}>{l.label}</option>)}
+                    </select>
                   </div>
                 );
               })}
@@ -1763,13 +1820,14 @@ function StudentsTab({cls,upd}) {
         )}
         {cls.students.length>0&&(
           <div className="student-roster-panel" style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:10,padding:16}}>
-            <div style={{fontSize:9,letterSpacing:2,opacity:.35,marginBottom:10,color:T.dark}}>SAVED ({cls.students.length})</div>
+            <div style={{fontSize:9,letterSpacing:2,marginBottom:10,color:T.muted}}>SAVED ({cls.students.length})</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6,maxHeight:390,overflowY:"auto"}}>
             {cls.students.map(s=>{const m=cls.studentMeta?.[s]??{};const gc=m.gender?genderColor(m.gender,T):null;
               return (
                 <span key={s} style={{background:T.chip,padding:"3px 10px",borderRadius:20,fontSize:12,display:"flex",alignItems:"center",gap:5,color:T.dark}}>
                   {s}{gc&&<span style={{width:7,height:7,borderRadius:"50%",background:gc,display:"inline-block"}}/>}
                   {m.grade&&<span style={{fontSize:9,color:T.muted}}>{m.grade}</span>}
+                  {mentalCapacityValue(m)!==null&&<span style={{fontSize:9,color:T.muted}}>MC {m.mentalCapacity}</span>}
                 </span>
               );
             })}
@@ -1785,6 +1843,12 @@ function StudentsTab({cls,upd}) {
                 <div style={{fontSize:9,letterSpacing:1.5,color:T.muted,marginBottom:4}}>WITH GENDER</div>
                 <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:T.dark}}>
                   {cls.students.filter(s=>cls.studentMeta?.[s]?.gender).length}
+                </div>
+              </div>
+              <div style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",gridColumn:"1 / -1"}}>
+                <div style={{fontSize:9,letterSpacing:1.5,color:T.muted,marginBottom:4}}>WITH MENTAL CAPACITY</div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:T.dark}}>
+                  {cls.students.filter(s=>mentalCapacityValue(cls.studentMeta?.[s])!==null).length}
                 </div>
               </div>
             </div>
@@ -1925,7 +1989,9 @@ function ChemistryTab({cls,upd}) {
                     <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:col,fontWeight:700}}>{v}</span>
                   </div>
                   <input type="range" min={0} max={100} step={5} value={v}
-                    onChange={e=>setChem(editing.a,editing.b,+e.target.value)} style={{width:"100%",accentColor:col}}/>
+                    onChange={e=>setChem(editing.a,editing.b,+e.target.value)}
+                    onInput={e=>setChem(editing.a,editing.b,+e.currentTarget.value)}
+                    style={{width:"100%",accentColor:col}}/>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:T.muted,marginTop:2}}>
                     <span style={{color:"#E53E3E"}}>0 Never</span>
                     <span style={{color:"#C8C820"}}>50 Caution</span>
@@ -2064,7 +2130,7 @@ function PresenterView({cls,layout,result,studentMeta,allGrades,locked,onClose})
 }
 
 // ─── randomize tab ────────────────────────────────────────────────────────────
-function RandomizeTab({cls}) {
+function RandomizeTab({cls,upd}) {
   const T=useT();
   const lids=Object.keys(cls.layouts);
   const [lid,setLid]=useState(cls.activeLayoutId||lids[0]||"");
@@ -2084,12 +2150,21 @@ function RandomizeTab({cls}) {
   const radius=settings.proximityRadius??120;
   const allGrades=[...new Set(Object.values(studentMeta).map(m=>m?.grade).filter(Boolean))].sort();
   const validLocked=new Set([...locked].filter(stu=>students.includes(stu)));
+  const setSetting=(f,v)=>upd(c=>({...c,settings:{...(c.settings??{}),[f]:v}}));
+  const mentalCapacityCount=students.filter(stu=>mentalCapacityValue(studentMeta[stu])!==null).length;
+  const frequencyRows=Object.entries(cls.sitTogether??{})
+    .map(([key,count])=>({key,count,names:key.split("|||")}))
+    .filter(row=>row.names.length===2&&row.names.every(name=>students.includes(name)))
+    .sort((a,b)=>b.count-a.count||a.key.localeCompare(b.key));
 
   const run=()=>{
     if(!layout||!students.length)return;setRunning(true);setSwapping(null);
     setTimeout(()=>{
       const slotResult=runLockedSA(students,seats,result,validLocked,chemistry,radius,studentMeta,settings);
-      setResult(collapseSlotAssignments(slotResult));
+      const nextResult=collapseSlotAssignments(slotResult);
+      setResult(nextResult);
+      const together=seatedTogetherPairs(nextResult,seats,radius);
+      if(together.length) upd(c=>({...c,sitTogether:addSitTogetherCounts(c.sitTogether,together)}));
       setRunning(false);
     },20);
   };
@@ -2142,7 +2217,11 @@ function RandomizeTab({cls}) {
   };
 
   const canRun=layout&&students.length>0&&seatSlots.length>0&&!running;
-  const active=[settings.separateGenders&&`Gender (w=${settings.genderWeight})`,settings.mixGrades&&`Grade mix (w=${settings.gradeWeight})`].filter(Boolean);
+  const active=[
+    settings.separateGenders&&`Gender (w=${settings.genderWeight})`,
+    settings.mixGrades&&`Grade mix (w=${settings.gradeWeight})`,
+    settings.mixMentalCapacity&&`Mental capacity ${settings.mentalMixMode==="homogeneous"?"homogeneous":"heterogeneous"} (w=${settings.mentalCapacityWeight})`,
+  ].filter(Boolean);
 
   return (
     <div>
@@ -2152,7 +2231,7 @@ function RandomizeTab({cls}) {
       )}
       <div style={{display:"flex",gap:20,alignItems:"flex-end",marginBottom:18,flexWrap:"wrap"}}>
         <div>
-          <div style={{fontSize:9,letterSpacing:2,opacity:.35,marginBottom:7,color:T.dark}}>LAYOUT</div>
+          <div style={{fontSize:9,letterSpacing:2,marginBottom:7,color:T.muted}}>LAYOUT</div>
           <select value={lid} onChange={e=>{setLid(e.target.value);setResult(null);setSwapping(null);}}
             style={{border:`1px solid ${T.border}`,borderRadius:6,padding:"8px 12px",fontSize:13,background:T.panel,color:T.dark,minWidth:160}}>
             {!lids.length&&<option value="">No layouts yet</option>}
@@ -2160,13 +2239,39 @@ function RandomizeTab({cls}) {
           </select>
         </div>
         <div>
-          <div style={{fontSize:9,letterSpacing:2,opacity:.35,marginBottom:7,color:T.dark}}>PROXIMITY · {radius}px</div>
+          <div style={{fontSize:9,letterSpacing:2,marginBottom:7,color:T.muted}}>PROXIMITY · {radius}px</div>
           <div style={{fontSize:11,color:T.muted}}>Capacity {totalCapacity} seat{totalCapacity!==1?"s":""} · adjust in Layout</div>
         </div>
         <ABtn onClick={run} disabled={!canRun}>{running?"Optimizing…":"⚡ Randomize"}</ABtn>
         {result&&<ABtn onClick={openPresenter} style={{background:T.sel}}>Present</ABtn>}
         {result&&<GBtn onClick={()=>{setResult(null);setSwapping(null);}}>Clear</GBtn>}
         {validLocked.size>0&&<GBtn onClick={()=>setLocked(new Set())}>Unlock all</GBtn>}
+      </div>
+
+      <div style={{fontSize:12,color:T.dark,marginBottom:12,background:T.panel,borderRadius:7,
+        border:`1px solid ${T.border}`,padding:"10px 14px",display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
+        <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:T.dark,userSelect:"none"}}>
+          <input type="checkbox" checked={settings.mixMentalCapacity??false}
+            onChange={e=>setSetting("mixMentalCapacity",e.target.checked)}/>
+          Mix by mental capacity
+        </label>
+        <select value={settings.mentalMixMode??"heterogeneous"} disabled={!settings.mixMentalCapacity}
+          onChange={e=>setSetting("mentalMixMode",e.target.value)}
+          style={{border:`1px solid ${T.border}`,borderRadius:6,padding:"7px 12px",fontSize:12,background:T.panel,
+            color:settings.mixMentalCapacity?T.dark:T.muted,minWidth:190,cursor:settings.mixMentalCapacity?"pointer":"default"}}>
+          <option value="homogeneous">Homogeneous Mixing</option>
+          <option value="heterogeneous">Heterogeneous Mixing</option>
+        </select>
+        {settings.mixMentalCapacity&&(
+          <div style={{display:"flex",alignItems:"center",gap:8,minWidth:260}}>
+            <span style={{fontSize:11,color:T.muted}}>Weight</span>
+            <SettingsSlider value={settings.mentalCapacityWeight??50}
+              onChange={v=>setSetting("mentalCapacityWeight",v)} min={0} max={150} step={5}/>
+          </div>
+        )}
+        <span style={{fontSize:11,color:T.muted,marginLeft:"auto"}}>
+          {mentalCapacityCount}/{students.length} students set
+        </span>
       </div>
 
       {active.length>0&&(
@@ -2215,6 +2320,35 @@ function RandomizeTab({cls}) {
                 </button>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {frequencyRows.length>0&&(
+        <div style={{fontSize:12,color:T.dark,marginBottom:12,background:T.panel,borderRadius:7,
+          border:`1px solid ${T.border}`,padding:"10px 14px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8,flexWrap:"wrap"}}>
+            <span style={{fontSize:10,letterSpacing:2,color:T.muted}}>SIT-TOGETHER FREQUENCY</span>
+            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+              <span style={{fontSize:11,color:T.muted}}>Counts neighbor/table pairs after each Randomize run</span>
+              <button onClick={()=>upd(c=>({...c,sitTogether:{}}))}
+                style={{background:"none",border:`1px solid ${T.border}`,borderRadius:5,padding:"4px 8px",fontSize:11,color:T.muted}}>
+                Reset
+              </button>
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:6}}>
+            {frequencyRows.slice(0,12).map(row=>(
+              <div key={row.key} style={{display:"flex",alignItems:"center",gap:8,border:`1px solid ${T.border}`,
+                borderRadius:7,padding:"7px 9px",background:T.bg}}>
+                <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {row.names[0].split(" ")[0]} ↔ {row.names[1].split(" ")[0]}
+                </span>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:T.accent,fontWeight:700}}>
+                  {row.count}×
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -2309,6 +2443,7 @@ function SettingsSlider({value, onChange, min, max, step}) {
       <input type="range" min={min} max={max} step={step}
         value={local}
         onChange={e=>{const v=+e.target.value; setLocal(v); onChange(v);}}
+        onInput={e=>{const v=+e.currentTarget.value; setLocal(v); onChange(v);}}
         style={{flex:1,cursor:"pointer"}}/>
       <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,minWidth:32,
         textAlign:"right",color:T.dark}}>{local}</span>
@@ -2347,6 +2482,7 @@ function SettingsTab({cls,upd}) {
     ["Neighbor radius",`${s.proximityRadius??120}px`],
     ["Gender separation",s.separateGenders?`On · ${s.genderWeight??50}`:"Off"],
     ["Grade mixing",s.mixGrades?`On · ${s.gradeWeight??50}`:"Off"],
+    ["Mental capacity",s.mixMentalCapacity?`${s.mentalMixMode==="homogeneous"?"Homogeneous":"Heterogeneous"} · ${s.mentalCapacityWeight??50}`:"Off"],
   ];
   return (//s
     <div className="settings-shell">
@@ -2367,6 +2503,22 @@ function SettingsTab({cls,upd}) {
           <Toggle f="mixGrades" label="Encourage grade mixing"/>
         </Row>
         {s.mixGrades&&<Row label="Grade mixing weight" desc="Extra penalty per same-grade pair."><Slider f="gradeWeight" min={0} max={150} step={5}/></Row>}
+        <Sec t="MENTAL CAPACITY"/>
+        <Row label="Mix by mental capacity" desc="Uses each student's 1-5 mental capacity from the Students tab.">
+          <Toggle f="mixMentalCapacity" label="Enable mental capacity mixing"/>
+        </Row>
+        {s.mixMentalCapacity&&<>
+          <Row label="Mixing style" desc="Homogeneous seats similar capacity nearby. Heterogeneous seats different capacity nearby.">
+            <select value={s.mentalMixMode??"heterogeneous"} onChange={e=>set("mentalMixMode",e.target.value)}
+              style={{border:`1px solid ${T.border}`,borderRadius:6,padding:"8px 12px",fontSize:13,background:T.panel,color:T.dark,minWidth:190,cursor:"pointer"}}>
+              <option value="homogeneous">Homogeneous Mixing</option>
+              <option value="heterogeneous">Heterogeneous Mixing</option>
+            </select>
+          </Row>
+          <Row label="Mental capacity weight" desc="Extra penalty when nearby students do not match the selected mixing style.">
+            <Slider f="mentalCapacityWeight" min={0} max={150} step={5}/>
+          </Row>
+        </>}
       </div>
       <div className="insight-panel">
         <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:12}}>CURRENT RULES</div>
