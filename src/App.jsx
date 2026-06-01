@@ -341,7 +341,7 @@ const LIGHT = {
   tipBg:"#EEF1EA",
   tipBorder:"#AAAE8E",
   tipText:"#3A606E",
-  gMale:"#3A606E",gFemale:"#AAAE8E",gOther:"#828E82",
+  gMale:"#F97316",gFemale:"#8B5CF6",gOther:"#828E82",
   grades:["#3A606E","#607B7D","#828E82","#AAAE8E","#526F67","#75816F","#4C6C7A","#979B7C"],
   isDark:false,
 };
@@ -367,7 +367,7 @@ const DARK = {
   tipBg:"#243130",
   tipBorder:"#607B7D",
   tipText:"#E0E0E0",
-  gMale:"#84A6B3",gFemale:"#C8CCA4",gOther:"#9BA89C",
+  gMale:"#F97316",gFemale:"#8B5CF6",gOther:"#9BA89C",
   grades:["#84A6B3","#A7B3AF","#9BA89C","#C8CCA4","#6F8F92","#B1B68F","#7495A2","#8B9A88"],
   isDark:true,
 };
@@ -376,13 +376,19 @@ const useT = () => useContext(ThemeCtx);
 
 const genderColor = (g,T) => ({M:T.gMale,F:T.gFemale,X:T.gOther}[g]??T.muted);
 const FIXED_GRADE_COLORS = {
-  "9":PAL.deep,
-  "10":PAL.slate,
-  "11":PAL.olive,
-  "12":PAL.sage,
+  "9":"#DC2626",
+  "10":"#DB2777",
+  "11":"#2563EB",
+  "12":"#16A34A",
 };
 const gradeColor  = (g,all,T) => FIXED_GRADE_COLORS[g] ?? T.grades[all.indexOf(g)%T.grades.length] ?? "#aaa";
-const gradeTextColor = g => g==="11" ? "#233B43" : "#fff";
+const gradeTextColor = () => "#fff";
+const studentChipBackground = (m,allGrades,T) => {
+  const grade = m?.grade ? gradeColor(m.grade, allGrades, T) : null;
+  const gender = m?.gender ? genderColor(m.gender, T) : null;
+  if (grade && gender) return `linear-gradient(90deg, ${grade} 0 50%, ${gender} 50% 100%)`;
+  return grade ?? gender ?? "transparent";
+};
 const svgDataUrl = svg => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 const gridPattern = (T,snap=false) => svgDataUrl(snap
   ? `<svg xmlns="http://www.w3.org/2000/svg" width="${GRID_SZ}" height="${GRID_SZ}" viewBox="0 0 ${GRID_SZ} ${GRID_SZ}"><path d="M .5 0 V ${GRID_SZ} M 0 .5 H ${GRID_SZ}" fill="none" stroke="${T.grid}" stroke-opacity=".35" stroke-width="1"/></svg>`
@@ -782,11 +788,11 @@ export default function App() {
       <div className="app-shell">
         {/* Sidebar */}
         <aside className="app-sidebar">
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:2,width:"100%"}}>
             <SeatCraftLogo size={30} color={T.isDark?T.accent:T.sidebarText}/>
             <div style={{fontFamily:"'Barlow Condensed',serif",fontSize:21,lineHeight:1}}>SeatCraft</div>
           </div>
-          <div style={{fontSize:9,letterSpacing:2,opacity:.3,marginBottom:8}}>CLASSROOM SEATING</div>
+          <div style={{fontSize:9,letterSpacing:2,opacity:.3,marginBottom:8,textAlign:"center"}}>CLASSROOM SEATING</div>
           <div style={{fontSize:10,color:T.sidebarMuted,marginBottom:18,overflow:"hidden",
             textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={teacher}>{teacher}</div>
           <div style={{fontSize:9,letterSpacing:2,opacity:.3,marginBottom:10}}>CLASSES</div>
@@ -884,7 +890,7 @@ function ClassView({cls,tab,setTab,upd,savedLayouts,setSavedLayouts}) {
         {tab==="chemistry" &&<ChemistryTab cls={cls} upd={upd}/>}
         {tab==="randomize" &&<RandomizeTab cls={cls} upd={upd}/>}
         {tab==="settings"  &&<SettingsTab  cls={cls} upd={upd}/>}
-        {tab==="controls"  &&<ControlsTab/>}
+        {tab==="controls"  &&<ControlsTab cls={cls}/>}
       </div>
     </div>
   );
@@ -1531,12 +1537,13 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
           padding:"0 3px", lineHeight:1.2, maxHeight:"100%", overflow:"hidden"}}>
           {assignedStudents.map((name,i) => {
             const m = Array.isArray(meta) ? (meta[i] ?? {}) : primaryMeta;
-            const bg = m.grade ? gradeColor(m.grade, allGrades, T) : "transparent";
+            const hasChipColor = Boolean(m.grade || m.gender);
+            const bg = studentChipBackground(m, allGrades, T);
             const active=activeStudentKey===`${seat.id}::${i}`;
             const chipStyle={display:"block",whiteSpace:"nowrap",overflow:"hidden",
-              textOverflow:"ellipsis",maxWidth:W-8,borderRadius:999,padding:m.grade?"2px 6px":"1px 4px",
-              background:active?T.sel:bg,color:active?"#fff":(m.grade?gradeTextColor(m.grade):"#fff"),
-              boxShadow:active?`0 0 0 2px #fff, 0 0 0 4px ${T.sel}`:(m.grade?"0 1px 3px rgba(0,0,0,.18)":"none"),
+              textOverflow:"ellipsis",maxWidth:W-8,borderRadius:999,padding:hasChipColor?"2px 6px":"1px 4px",
+              background:active?T.sel:bg,color:active?"#fff":(hasChipColor?gradeTextColor(m.grade):"#fff"),
+              boxShadow:active?`0 0 0 2px #fff, 0 0 0 4px ${T.sel}`:(hasChipColor?"0 1px 3px rgba(0,0,0,.18)":"none"),
               border:"none",font:"inherit",lineHeight:1.2};
             return onStudentClick ? (
               <button key={`${name}-${i}`} type="button"
@@ -2185,6 +2192,28 @@ function RandomizeTab({cls,upd}) {
     });
   };
 
+  // Manual move: after selecting a student chip, click any desk/table with open
+  // capacity to move that student there. Chip-to-chip clicks still swap.
+  const handleSeatClick=seatId=>{
+    if(!result||!swapping)return;
+    if(swapping.seatId===seatId){setSwapping(null);return;}
+    const targetSeat=seats.find(s=>s.id===seatId);
+    if(!targetSeat)return;
+    setResult(r=>{
+      const next={...r};
+      const source=[...assignedStudentsFor(next,swapping.seatId)];
+      const target=[...assignedStudentsFor(next,seatId)];
+      const moving=source[swapping.studentIndex];
+      if(!moving||target.length>=seatCapacity(targetSeat)) return r;
+      source.splice(swapping.studentIndex,1);
+      target.push(moving);
+      next[swapping.seatId]=source;
+      next[seatId]=target;
+      return next;
+    });
+    setSwapping(null);
+  };
+
   // Manual swap: click two individual student chips to swap only those students.
   const handleStudentClick=(seatId,studentIndex)=>{
     if(!result)return;
@@ -2294,8 +2323,8 @@ function RandomizeTab({cls,upd}) {
           border:`1px solid ${T.border}`,padding:"8px 14px",display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
           <span>↕ Swap mode:</span>
           {swapping===null
-            ?<span>Click one student name, then another student name to swap them</span>
-            :<span style={{color:T.accent,fontWeight:500}}>Now click another student to swap — or click the same student to cancel</span>}
+            ?<span>Click one student name, then another student name to swap, or an open seat to move them</span>
+            :<span style={{color:T.accent,fontWeight:500}}>Now click another student to swap, an open seat to move, or the same student to cancel</span>}
         </div>
       )}
 
@@ -2379,7 +2408,8 @@ function RandomizeTab({cls,upd}) {
               {seats.map(seat=>{
                 const assigned=result?assignedStudentsFor(result,seat.id):[];
                 const isSwapSrc=swapping?.seatId===seat.id;
-                const isSwapTarget=swapping!==null&&swapping.seatId!==seat.id&&assigned.length>0;
+                const hasOpenSeat=assigned.length<seatCapacity(seat);
+                const isSwapTarget=swapping!==null&&swapping.seatId!==seat.id&&(assigned.length>0||hasOpenSeat);
                 const isLocked=assigned.some(stu=>validLocked.has(stu));
                 return (
                   <DeskBody key={seat.id} seat={seat} theme={T} isLocked={isLocked}
@@ -2387,7 +2417,7 @@ function RandomizeTab({cls,upd}) {
                     isHovered={hov?.id===seat.id||isSwapTarget}
                     students={assigned} meta={assigned.map(stu=>studentMeta[stu]??{})} allGrades={allGrades}
                     readonly={false}
-                    onMD={e=>{e.preventDefault();}}
+                    onMD={e=>{e.preventDefault();if(swapping)handleSeatClick(seat.id);}}
                     onHov={setHov} onCtx={()=>{}} onLock={lockDesk}
                     onStudentClick={result?handleStudentClick:null}
                     activeStudentKey={swapping?`${swapping.seatId}::${swapping.studentIndex}`:null}/>
@@ -2539,8 +2569,9 @@ function SettingsTab({cls,upd}) {
 }
 
 // ─── controls tab ─────────────────────────────────────────────────────────────
-function ControlsTab() {
+function ControlsTab({cls}) {
   const T=useT();
+  const s=cls?.settings??{};
   const Sec=({title,children})=>(
     <div style={{marginBottom:32}}>
       <div style={{fontSize:10,letterSpacing:2,color:T.muted,marginBottom:14}}>{title}</div>
@@ -2559,13 +2590,40 @@ function ControlsTab() {
       <span style={{fontSize:13,color:T.dark}}>{desc}</span>
     </div>
   );
+  const VRow=({label,value,desc})=>(
+    <div style={{display:"grid",gridTemplateColumns:"minmax(140px,180px) minmax(70px,90px) 1fr",
+      gap:12,alignItems:"start",padding:"10px 0",borderBottom:`1px solid ${T.border}`}}>
+      <span style={{fontSize:13,color:T.dark,fontWeight:500}}>{label}</span>
+      <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:T.accent,fontWeight:700}}>{value}</span>
+      <span style={{fontSize:12,color:T.muted,lineHeight:1.55}}>{desc}</span>
+    </div>
+  );
 
   return (
     <div style={{width:"100%"}}>
       <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,marginBottom:6,color:T.dark}}>Controls Reference</div>
-      <p style={{color:T.muted,fontSize:13,marginBottom:28,lineHeight:1.6}}>All keyboard shortcuts and interaction patterns in one place.</p>
+      <p style={{color:T.muted,fontSize:13,marginBottom:28,lineHeight:1.6}}>Keyboard shortcuts, interaction patterns, and randomizer value meanings in one place.</p>
 
       <div className="controls-grid">
+        <Sec title="RANDOMIZER VALUES">
+          <VRow label="Neighbor radius" value={`${s.proximityRadius??120}px`}
+            desc="Two desks within this screen-pixel distance count as neighbors. Bigger values make more nearby pairs affect the score."/>
+          <VRow label="Chemistry score" value="0-100"
+            desc="0 means never seat together, 50 means caution, and 100 means fine. Lower scores add more penalty when students are neighbors."/>
+          <VRow label="Gender separation" value={s.separateGenders?`On · ${s.genderWeight??50}`:"Off"}
+            desc="When on, same-gender neighbor pairs receive an extra penalty using the M/F/X values from Students."/>
+          <VRow label="Gender weight" value={`${s.genderWeight??50}`}
+            desc="Strength of that same-gender penalty: 0 ignores it, 50 is moderate, 80 is about one strong avoid pair, and 150 is very strong."/>
+          <VRow label="Grade mixing" value={s.mixGrades?`On · ${s.gradeWeight??50}`:"Off"}
+            desc="When on, same-grade neighbor pairs receive an extra penalty so the optimizer spreads grade levels apart."/>
+          <VRow label="Grade weight" value={`${s.gradeWeight??50}`}
+            desc="Strength of the same-grade penalty. Higher values make grade mixing matter more than chemistry."/>
+          <VRow label="Focus level mixing" value={s.mixMentalCapacity?`${s.mentalMixMode==="homogeneous"?"Same":"Different"} · ${s.mentalCapacityWeight??50}`:"Off"}
+            desc="Uses the 1-5 focus level from Students. Homogeneous keeps similar focus levels nearby; heterogeneous spreads similar focus levels apart."/>
+          <VRow label="Table capacity" value="Layout +/-"
+            desc="The plus and minus controls on each desk set how many students fit there. Open capacity can receive moved students in Randomize."/>
+        </Sec>
+
         <Sec title="PLACING DESKS">
           <KRow keys={["Click canvas"]} desc="Place a new desk at that position"/>
           <KRow keys={["Drag desk"]} desc="Reposition the desk"/>
@@ -2608,7 +2666,8 @@ function ControlsTab() {
           <KRow keys={["Randomize"]} desc="Run SA optimizer to assign all students to seats"/>
           <KRow keys={["Present"]} desc="Open a fullscreen seating chart for screen sharing or classroom display"/>
           <KRow keys={["Lock chips","Desk lock"]} desc="Keep selected students in their current seats on the next randomize"/>
-          <KRow keys={["Click two desks"]} desc="After randomizing, click two seats to swap their students"/>
+          <KRow keys={["Click two names"]} desc="After randomizing, swap two individual students"/>
+          <KRow keys={["Name, then open seat"]} desc="Move the selected student into an empty desk or table spot"/>
           <KRow keys={["Clear"]} desc="Clear the randomized result and start over"/>
         </Sec>
 
