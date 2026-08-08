@@ -124,6 +124,30 @@ const mentalCapacityValue = meta => {
   const n = Number(meta?.mentalCapacity);
   return Number.isFinite(n) && n >= 1 && n <= 5 ? n : null;
 };
+const needsLearningSupport = meta => Boolean(meta?.learningSupport);
+const seatGroupsWithinRadius = (seats,r) => {
+  const groups=[];
+  const seen=new Set();
+  seats.forEach(seat=>{
+    if(seen.has(seat.id)) return;
+    const group=[];
+    const stack=[seat];
+    seen.add(seat.id);
+    while(stack.length){
+      const cur=stack.pop();
+      group.push(cur.id);
+      seats.forEach(next=>{
+        if(seen.has(next.id)) return;
+        if(edist(cur,next)<=r){
+          seen.add(next.id);
+          stack.push(next);
+        }
+      });
+    }
+    groups.push(group);
+  });
+  return groups;
+};
 const seatedTogetherPairs = (result,seats,r) => {
   if(!result) return [];
   const positioned=[];
@@ -223,12 +247,13 @@ const mkClass = name=>({
   settings:{
     proximityRadius:120,
     separateGenders:false,
-    genderWeight:50,
+    genderWeight:5,
     mixGrades:false,
-    gradeWeight:50,
+    gradeWeight:5,
     mixMentalCapacity:false,
     mentalMixMode:"heterogeneous",
     mentalCapacityWeight:50,
+    evenGroups:false,
   },
 });
 const mkLayout = name=>({id:uid(),name,seats:[],roomPoly:DEFAULT_ROOM()});
@@ -256,14 +281,18 @@ const layoutFromSaved = saved=>({
 // ─── SA optimizer ─────────────────────────────────────────────────────────────
 function scoreFn(asgn,seats,chem,r,studentMeta={},settings={}) {
   let p=0; const pairs=Object.entries(asgn).filter(([,v])=>v);
+  pairs.forEach(([sid,student])=>{
+    const seat=seats.find(s=>s.id===sid);
+    if(seat&&needsLearningSupport(studentMeta?.[student])) p+=(seat.y/CH)*120;
+  });
   for(let i=0;i<pairs.length;i++) for(let j=i+1;j<pairs.length;j++){
     const[si,sa]=pairs[i],[sj,sb]=pairs[j];
     const sA=seats.find(s=>s.id===si),sB=seats.find(s=>s.id===sj);
     if(!sA||!sB||edist(sA,sB)>r) continue;
-    p+=100-(chem[pairKey(sa,sb)]??100);
+    p+=chem[pairKey(sa,sb)]??50;
     const mA=studentMeta?.[sa]??{},mB=studentMeta?.[sb]??{};
-    if(settings?.separateGenders&&mA.gender&&mB.gender&&mA.gender===mB.gender) p+=settings.genderWeight??50;
-    if(settings?.mixGrades&&mA.grade&&mB.grade&&mA.grade===mB.grade) p+=settings.gradeWeight??50;
+    if(settings?.separateGenders&&mA.gender&&mB.gender&&mA.gender===mB.gender) p+=clamp(settings.genderWeight??5,0,10);
+    if(settings?.mixGrades&&mA.grade&&mB.grade&&mA.grade===mB.grade) p+=clamp(settings.gradeWeight??5,0,10);
     if(settings?.mixMentalCapacity){
       const capA=mentalCapacityValue(mA),capB=mentalCapacityValue(mB);
       if(capA!==null&&capB!==null){
@@ -271,6 +300,16 @@ function scoreFn(asgn,seats,chem,r,studentMeta={},settings={}) {
         const weight=settings.mentalCapacityWeight??50;
         p+=(settings.mentalMixMode==="homogeneous" ? diff/4 : (4-diff)/4) * weight;
       }
+    }
+  }
+  if(settings?.evenGroups){
+    const groups=seatGroupsWithinRadius(seats,r);
+    const occupiedBySeat=Object.fromEntries(pairs.map(([sid])=>[sid.split("::")[0],true]));
+    const counts=groups.map(group=>group.reduce((sum,id)=>sum+(occupiedBySeat[id]?1:0),0));
+    const activeCounts=counts.filter(count=>count>0);
+    if(activeCounts.length>1){
+      const avg=activeCounts.reduce((sum,count)=>sum+count,0)/activeCounts.length;
+      p+=activeCounts.reduce((sum,count)=>sum+Math.abs(count-avg),0)*25;
     }
   }
   return p;
@@ -868,7 +907,8 @@ function EmptyState({onAdd}) {
 // ─── class view ───────────────────────────────────────────────────────────────
 function ClassView({cls,tab,setTab,upd,savedLayouts,setSavedLayouts}) {
   const T=useT();
-  const TABS=["layout","students","chemistry","randomize","settings","controls"];
+  const TABS=["layout","students","randomize","chemistry","settings","controls","about"];
+  const tabLabel=t=>t==="about"?"About Us":t;
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%",minHeight:0}}>
       <div className="class-header">
@@ -878,8 +918,8 @@ function ClassView({cls,tab,setTab,upd,savedLayouts,setSavedLayouts}) {
             <button key={t} className="tab-btn" onClick={()=>setTab(t)}
               style={{background:"none",border:"none",padding:"7px 18px",fontSize:13,
                 fontWeight:tab===t?500:400,borderBottom:`2px solid ${tab===t?T.accent:"transparent"}`,
-                color:tab===t?T.accent:T.muted,textTransform:"capitalize"}}>
-              {t}
+                color:tab===t?T.accent:T.muted,textTransform:t==="about"?"none":"capitalize"}}>
+              {tabLabel(t)}
             </button>
           ))}
         </div>
@@ -891,6 +931,7 @@ function ClassView({cls,tab,setTab,upd,savedLayouts,setSavedLayouts}) {
         {tab==="randomize" &&<RandomizeTab cls={cls} upd={upd}/>}
         {tab==="settings"  &&<SettingsTab  cls={cls} upd={upd}/>}
         {tab==="controls"  &&<ControlsTab cls={cls}/>}
+        {tab==="about"     &&<AboutTab/>}
       </div>
     </div>
   );
@@ -1363,12 +1404,6 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
               </>}
             </div>
 
-            {/* Hint bar */}
-            <div style={{fontSize:10,color:T.muted,marginBottom:6,display:"flex",gap:12,flexWrap:"wrap"}}>
-              <span>Ctrl+Z/Y undo/redo</span><span>Ctrl+C/V copy/paste</span><span>Ctrl+D dupe</span>
-              <span>Ctrl+A select all</span><span>Del remove</span><span>Arrows 1px (Shift=10px)</span><span>R rotate 15°</span>
-            </div>
-
             {/* Canvas */}
             <div className="canvas-scroll">
             <div ref={canvasRef} className="canvas-stage"
@@ -1485,7 +1520,7 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
 //   • Scale changes W/H → wrapper grows/shrinks, visual matches, position stays centred ✓
 //   • Rotation only affects the visual layer → text always stays horizontal ✓
 //   • Hex uses SVG visual for clean stroke (clip-path would clip the border) ✓
-function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,students,meta,allGrades,readonly,onMD,onHov,onCtx,onCapacityChange,onLock,onStudentClick,activeStudentKey}) {
+function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,students,meta,allGrades,readonly,onMD,onHov,onCtx,onCapacityChange,onLock,onStudentClick,activeStudentKey,showStudentColors=true}) {
   const sh  = getShape(seat.shape);
   const sc  = seat.scale ?? 1;
   const W   = sh.w * sc;          // scaled width
@@ -1537,11 +1572,11 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
           padding:"0 3px", lineHeight:1.2, maxHeight:"100%", overflow:"hidden"}}>
           {assignedStudents.map((name,i) => {
             const m = Array.isArray(meta) ? (meta[i] ?? {}) : primaryMeta;
-            const hasChipColor = Boolean(m.grade || m.gender);
+            const hasChipColor = showStudentColors && Boolean(m.grade || m.gender);
             const bg = studentChipBackground(m, allGrades, T);
             const active=activeStudentKey===`${seat.id}::${i}`;
-            const chipStyle={display:"block",whiteSpace:"nowrap",overflow:"hidden",
-              textOverflow:"ellipsis",maxWidth:W-8,borderRadius:999,padding:hasChipColor?"2px 6px":"1px 4px",
+            const chipStyle={display:"block",whiteSpace:"normal",overflow:"visible",
+              overflowWrap:"anywhere",maxWidth:W-8,borderRadius:999,padding:hasChipColor?"2px 6px":"1px 4px",
               background:active?T.sel:bg,color:active?"#fff":(hasChipColor?gradeTextColor(m.grade):"#fff"),
               boxShadow:active?`0 0 0 2px #fff, 0 0 0 4px ${T.sel}`:(hasChipColor?"0 1px 3px rgba(0,0,0,.18)":"none"),
               border:"none",font:"inherit",lineHeight:1.2};
@@ -1703,7 +1738,7 @@ function StudentsTab({cls,upd}) {
     const students=[...new Set(raw.split("\n").map(cleanStudentName).filter(Boolean))];
     upd(c=>{
       const chem={...c.chemistry};
-      for(let i=0;i<students.length;i++) for(let j=i+1;j<students.length;j++){const k=pairKey(students[i],students[j]);if(!(k in chem))chem[k]=100;}
+      for(let i=0;i<students.length;i++) for(let j=i+1;j<students.length;j++){const k=pairKey(students[i],students[j]);if(!(k in chem))chem[k]=50;}
       const studentMeta={};students.forEach(s=>{studentMeta[s]=meta[s]??(c.studentMeta??{})[s]??{};});
       return{...c,students,chemistry:chem,studentMeta};
     });
@@ -1766,7 +1801,7 @@ function StudentsTab({cls,upd}) {
   return (
     <div style={{width:"100%"}}>
       <p style={{color:T.muted,fontSize:13,marginBottom:14,lineHeight:1.6}}>
-        One student per line. Set gender, grade, and focus level below for randomization constraints.
+        One student per line. Set gender, grade, focus level, and learning support below for randomization constraints.
       </p>
       <div className="students-shell">
         <div className="student-editor">
@@ -1792,7 +1827,7 @@ function StudentsTab({cls,upd}) {
         </div>
         {cls.students.length>0&&(
           <div className="student-meta-panel">
-            <div style={{fontSize:9,letterSpacing:2,marginBottom:6,color:T.muted}}>GENDER, GRADE & FOCUS LEVEL</div>
+            <div style={{fontSize:9,letterSpacing:2,marginBottom:6,color:T.muted}}>GENDER, GRADE, FOCUS & SUPPORT</div>
             <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:280,overflowY:"auto"}}>
               {cls.students.map(name=>{
                 const m=meta[name]??{};
@@ -1818,6 +1853,14 @@ function StudentsTab({cls,upd}) {
                       <option value="">Focus Level</option>
                       {MENTAL_CAPACITY_LEVELS.map(l=><option key={l.value} value={l.value}>{l.label}</option>)}
                     </select>
+                    <button onClick={()=>setM(name,"learningSupport",!m.learningSupport)}
+                      title="Seat this student closer to the board when randomizing"
+                      style={{padding:"3px 8px",fontSize:11,borderRadius:5,
+                        background:m.learningSupport?T.accentLt:"none",
+                        border:`1px solid ${m.learningSupport?T.accent:T.border}`,
+                        color:m.learningSupport?T.accent:T.muted,fontWeight:m.learningSupport?700:500}}>
+                      Support
+                    </button>
                   </div>
                 );
               })}
@@ -1835,6 +1878,7 @@ function StudentsTab({cls,upd}) {
                   {s}{gc&&<span style={{width:7,height:7,borderRadius:"50%",background:gc,display:"inline-block"}}/>}
                   {m.grade&&<span style={{fontSize:9,color:T.muted}}>{m.grade}</span>}
                   {mentalCapacityValue(m)!==null&&<span style={{fontSize:9,color:T.muted}}>MC {m.mentalCapacity}</span>}
+                  {needsLearningSupport(m)&&<span style={{fontSize:9,color:T.accent,fontWeight:700}}>SUPPORT</span>}
                 </span>
               );
             })}
@@ -1858,6 +1902,12 @@ function StudentsTab({cls,upd}) {
                   {cls.students.filter(s=>mentalCapacityValue(cls.studentMeta?.[s])!==null).length}
                 </div>
               </div>
+              <div style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",gridColumn:"1 / -1"}}>
+                <div style={{fontSize:9,letterSpacing:1.5,color:T.muted,marginBottom:4}}>WITH LEARNING SUPPORT</div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:T.dark}}>
+                  {cls.students.filter(s=>needsLearningSupport(cls.studentMeta?.[s])).length}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1872,12 +1922,13 @@ function ChemistryTab({cls,upd}) {
   const {students,chemistry}=cls;
   const [sel,setSel]=useState(null);
   const [editing,setEditing]=useState(null); // {a,b,x,y}
+  const [directA,setDirectA]=useState("");
+  const [directB,setDirectB]=useState("");
 
   if(students.length<2) return <div style={{color:T.muted,fontSize:14}}>Add at least 2 students first.</div>;
 
   const setChem=(a,b,v)=>upd(c=>({...c,chemistry:{...c.chemistry,[pairKey(a,b)]:v}}));
-  const getV=(a,b)=>chemistry[pairKey(a,b)]??100;
-  const lbl=v=>v===0?"Never":v<=25?"Avoid":v<=50?"Caution":v<=75?"OK":"Fine";
+  const getV=(a,b)=>chemistry[pairKey(a,b)]??50;
 
   const W=520,H=420,cx=W/2,cy=H/2;
   const others=sel?students.filter(s=>s!==sel):[];
@@ -1886,19 +1937,47 @@ function ChemistryTab({cls,upd}) {
   const pairValues=[];
   for(let i=0;i<students.length;i++) for(let j=i+1;j<students.length;j++){
     const a=students[i],b=students[j],v=getV(a,b);
-    pairValues.push({a,b,v,label:lbl(v)});
+    pairValues.push({a,b,v});
   }
   const selectedPairs=sel?pairValues.filter(p=>p.a===sel||p.b===sel).sort((a,b)=>a.v-b.v):[];
   const avg=pairValues.length?Math.round(pairValues.reduce((sum,p)=>sum+p.v,0)/pairValues.length):0;
-  const avoidCount=pairValues.filter(p=>p.v<=25).length;
-  const cautionCount=pairValues.filter(p=>p.v>25&&p.v<=50).length;
-  const fineCount=pairValues.filter(p=>p.v>75).length;
+  const lowCount=pairValues.filter(p=>p.v<=25).length;
+  const midCount=pairValues.filter(p=>p.v>25&&p.v<=50).length;
+  const highCount=pairValues.filter(p=>p.v>75).length;
 
   return (
     <div className="chemistry-shell">
       {/* Student list */}
       <div className="chemistry-list">
         <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:10}}>STUDENTS — click to view</div>
+        <div style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:8,padding:10,marginBottom:12}}>
+          <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:8}}>DIRECT EDIT</div>
+          <select value={directA} onChange={e=>{setDirectA(e.target.value);setEditing(null);}}
+            style={{width:"100%",border:`1px solid ${T.border}`,borderRadius:6,padding:"7px 10px",fontSize:12,background:T.panel,color:T.dark,marginBottom:7}}>
+            <option value="">First student</option>
+            {students.map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={directB} onChange={e=>{setDirectB(e.target.value);setEditing(null);}}
+            style={{width:"100%",border:`1px solid ${T.border}`,borderRadius:6,padding:"7px 10px",fontSize:12,background:T.panel,color:T.dark,marginBottom:8}}>
+            <option value="">Second student</option>
+            {students.filter(s=>s!==directA).map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+          {directA&&directB&&directA!==directB&&(()=>{
+            const v=getV(directA,directB),col=chemCol(v);
+            return (
+              <>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:T.muted}}>
+                  <span>Chemistry</span>
+                  <span style={{fontFamily:"'DM Mono',monospace",color:col,fontWeight:700}}>{v}</span>
+                </div>
+                <input type="range" min={0} max={100} step={5} value={v}
+                  onChange={e=>setChem(directA,directB,+e.target.value)}
+                  onInput={e=>setChem(directA,directB,+e.currentTarget.value)}
+                  style={{width:"100%",accentColor:col}}/>
+              </>
+            );
+          })()}
+        </div>
         <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:460,overflowY:"auto"}}>
           {students.map(s=>(
             <button key={s} onClick={()=>{setSel(s===sel?null:s);setEditing(null);}}
@@ -2000,9 +2079,9 @@ function ChemistryTab({cls,upd}) {
                     onInput={e=>setChem(editing.a,editing.b,+e.currentTarget.value)}
                     style={{width:"100%",accentColor:col}}/>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:T.muted,marginTop:2}}>
-                    <span style={{color:"#E53E3E"}}>0 Never</span>
-                    <span style={{color:"#C8C820"}}>50 Caution</span>
-                    <span style={{color:"#3AA840"}}>100 Fine</span>
+                    <span style={{color:"#E53E3E"}}>0</span>
+                    <span style={{color:"#C8C820"}}>50</span>
+                    <span style={{color:"#3AA840"}}>100</span>
                   </div>
                   <button onClick={()=>setEditing(null)}
                     style={{marginTop:10,width:"100%",background:"none",border:`1px solid ${T.border}`,
@@ -2018,8 +2097,8 @@ function ChemistryTab({cls,upd}) {
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8,marginBottom:16}}>
           {[
             ["AVG",avg,T.accent],
-            ["AVOID",avoidCount,"#E53E3E"],
-            ["FINE",fineCount,"#3AA840"],
+            ["LOW",lowCount,"#E53E3E"],
+            ["HIGH",highCount,"#3AA840"],
           ].map(([label,value,color])=>(
             <div key={label} style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 8px",textAlign:"center"}}>
               <div style={{fontSize:9,letterSpacing:1.4,color:T.muted,marginBottom:4}}>{label}</div>
@@ -2029,7 +2108,7 @@ function ChemistryTab({cls,upd}) {
         </div>
         <div style={{fontSize:12,color:T.muted,lineHeight:1.6,marginBottom:16}}>
           {sel
-            ? `${sel} has ${selectedPairs.filter(p=>p.v<=50).length} pair${selectedPairs.filter(p=>p.v<=50).length!==1?"s":""} that need seating attention.`
+            ? `${sel} has ${selectedPairs.filter(p=>p.v<=50).length} lower-scored pair${selectedPairs.filter(p=>p.v<=50).length!==1?"s":""} for relationship-building seats.`
             : `This class has ${pairValues.length} chemistry pair${pairValues.length!==1?"s":""}. Select a student to inspect their closest risks.`}
         </div>
         <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:8}}>
@@ -2051,16 +2130,16 @@ function ChemistryTab({cls,upd}) {
         </div>
         <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:8}}>DISTRIBUTION</div>
         <div style={{height:9,borderRadius:999,overflow:"hidden",display:"flex",background:T.bg,border:`1px solid ${T.border}`}}>
-          <div style={{width:`${pairValues.length?(avoidCount/pairValues.length)*100:0}%`,background:"#E53E3E"}}/>
-          <div style={{width:`${pairValues.length?(cautionCount/pairValues.length)*100:0}%`,background:"#C8C820"}}/>
-          <div style={{width:`${pairValues.length?(fineCount/pairValues.length)*100:0}%`,background:"#3AA840"}}/>
+          <div style={{width:`${pairValues.length?(lowCount/pairValues.length)*100:0}%`,background:"#E53E3E"}}/>
+          <div style={{width:`${pairValues.length?(midCount/pairValues.length)*100:0}%`,background:"#C8C820"}}/>
+          <div style={{width:`${pairValues.length?(highCount/pairValues.length)*100:0}%`,background:"#3AA840"}}/>
         </div>
       </div>
     </div>
   );
 }
 
-function PresenterView({cls,layout,result,studentMeta,allGrades,locked,onClose}) {
+function PresenterView({cls,layout,result,studentMeta,allGrades,locked,showStudentColors,onClose}) {
   const T=useT();
   const [size,setSize]=useState(()=>({w:window.innerWidth,h:window.innerHeight}));
   useEffect(()=>{
@@ -2112,7 +2191,7 @@ function PresenterView({cls,layout,result,studentMeta,allGrades,locked,onClose})
                 <DeskBody key={seat.id} seat={seat} theme={T} isLocked={isLocked}
                   isSelected={false} isHovered={false}
                   students={assigned} meta={assigned.map(stu=>studentMeta[stu]??{})} allGrades={allGrades}
-                  readonly={true} onHov={()=>{}} onCtx={()=>{}}/>
+                  readonly={true} onHov={()=>{}} onCtx={()=>{}} showStudentColors={showStudentColors}/>
               );
             })}
           </div>
@@ -2123,7 +2202,7 @@ function PresenterView({cls,layout,result,studentMeta,allGrades,locked,onClose})
         </div>
       </div>
 
-      <div style={{marginTop:18,display:"flex",gap:12,alignItems:"center",justifyContent:"center",flexWrap:"wrap"}}>
+      {showStudentColors&&<div style={{marginTop:18,display:"flex",gap:12,alignItems:"center",justifyContent:"center",flexWrap:"wrap"}}>
         <span style={{fontSize:12,letterSpacing:2,color:T.muted}}>GRADE</span>
         {allGrades.map(g=>(
           <span key={g} style={{background:gradeColor(g,allGrades,T),color:gradeTextColor(g),
@@ -2131,7 +2210,7 @@ function PresenterView({cls,layout,result,studentMeta,allGrades,locked,onClose})
             {g}
           </span>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -2148,6 +2227,7 @@ function RandomizeTab({cls,upd}) {
   const [swapping,setSwapping]=useState(null); // {seatId, studentIndex} being moved
   const [locked,setLocked]=useState(()=>new Set());
   const [presenting,setPresenting]=useState(false);
+  const [presentColors,setPresentColors]=useState(true);
 
   const layout=lid?cls.layouts[lid]:null;
   const seats=layout?.seats||[];
@@ -2175,11 +2255,6 @@ function RandomizeTab({cls,upd}) {
       setRunning(false);
     },20);
   };
-  const toggleLock=stu=>setLocked(prev=>{
-    const next=new Set(prev);
-    next.has(stu)?next.delete(stu):next.add(stu);
-    return next;
-  });
   const lockDesk=sid=>{
     if(!result)return;
     const assigned=assignedStudentsFor(result,sid);
@@ -2247,8 +2322,8 @@ function RandomizeTab({cls,upd}) {
 
   const canRun=layout&&students.length>0&&seatSlots.length>0&&!running;
   const active=[
-    settings.separateGenders&&`Gender (w=${settings.genderWeight})`,
-    settings.mixGrades&&`Grade mix (w=${settings.gradeWeight})`,
+    settings.separateGenders&&`Gender (w=${clamp(settings.genderWeight??5,0,10)})`,
+    settings.mixGrades&&`Grade mix (w=${clamp(settings.gradeWeight??5,0,10)})`,
     settings.mixMentalCapacity&&`Focus Level ${settings.mentalMixMode==="homogeneous"?"homogeneous":"heterogeneous"} (w=${settings.mentalCapacityWeight})`,
   ].filter(Boolean);
 
@@ -2256,9 +2331,9 @@ function RandomizeTab({cls,upd}) {
     <div>
       {presenting&&layout&&result&&(
         <PresenterView cls={cls} layout={layout} result={result} studentMeta={studentMeta}
-          allGrades={allGrades} locked={validLocked} onClose={closePresenter}/>
+          allGrades={allGrades} locked={validLocked} showStudentColors={presentColors} onClose={closePresenter}/>
       )}
-      <div style={{display:"flex",gap:20,alignItems:"flex-end",marginBottom:18,flexWrap:"wrap"}}>
+      <div style={{display:"flex",gap:18,alignItems:"flex-end",marginBottom:12,flexWrap:"wrap"}}>
         <div>
           <div style={{fontSize:9,letterSpacing:2,marginBottom:7,color:T.muted}}>LAYOUT</div>
           <select value={lid} onChange={e=>{setLid(e.target.value);setResult(null);setSwapping(null);}}
@@ -2271,10 +2346,10 @@ function RandomizeTab({cls,upd}) {
           <div style={{fontSize:9,letterSpacing:2,marginBottom:7,color:T.muted}}>PROXIMITY · {radius}px</div>
           <div style={{fontSize:11,color:T.muted}}>Capacity {totalCapacity} seat{totalCapacity!==1?"s":""} · adjust in Layout</div>
         </div>
-        <ABtn onClick={run} disabled={!canRun}>{running?"Optimizing…":"⚡ Randomize"}</ABtn>
-        {result&&<ABtn onClick={openPresenter} style={{background:T.sel}}>Present</ABtn>}
-        {result&&<GBtn onClick={()=>{setResult(null);setSwapping(null);}}>Clear</GBtn>}
-        {validLocked.size>0&&<GBtn onClick={()=>setLocked(new Set())}>Unlock all</GBtn>}
+        <label style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontSize:12,color:T.dark,userSelect:"none",background:T.panel,border:`1px solid ${T.border}`,borderRadius:7,padding:"9px 12px"}}>
+          <input type="checkbox" checked={presentColors} onChange={e=>setPresentColors(e.target.checked)}/>
+          Present with colors
+        </label>
       </div>
 
       <div style={{fontSize:12,color:T.dark,marginBottom:12,background:T.panel,borderRadius:7,
@@ -2328,67 +2403,20 @@ function RandomizeTab({cls,upd}) {
         </div>
       )}
 
-      {result&&(
-        <div style={{fontSize:12,color:T.dark,marginBottom:12,background:T.panel,borderRadius:7,
-          border:`1px solid ${T.border}`,padding:"10px 14px"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8,flexWrap:"wrap"}}>
-            <span style={{fontSize:10,letterSpacing:2,color:T.muted}}>LOCK STUDENTS</span>
-            <span style={{fontSize:11,color:T.muted}}>{validLocked.size} locked · locked students stay in place on the next randomize</span>
-          </div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {students.map(stu=>{
-              const isLocked=validLocked.has(stu);
-              const isSeated=Object.values(result).flatMap(v=>Array.isArray(v)?v:[v]).includes(stu);
-              return (
-                <button key={stu} onClick={()=>toggleLock(stu)} disabled={!isSeated}
-                  title={isSeated?(isLocked?"Unlock student":"Lock student"):"Student is not currently seated"}
-                  style={{border:`1px solid ${isLocked?T.accent:T.border}`,background:isLocked?T.accentLt:T.bg,
-                    color:isLocked?T.accent:(isSeated?T.dark:T.muted),borderRadius:999,padding:"5px 10px",
-                    fontSize:11,fontWeight:isLocked?600:400,opacity:isSeated?1:.45}}>
-                  {isLocked?"🔒 ":""}{stu}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {frequencyRows.length>0&&(
-        <div style={{fontSize:12,color:T.dark,marginBottom:12,background:T.panel,borderRadius:7,
-          border:`1px solid ${T.border}`,padding:"10px 14px"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8,flexWrap:"wrap"}}>
-            <span style={{fontSize:10,letterSpacing:2,color:T.muted}}>SIT-TOGETHER FREQUENCY</span>
-            <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-              <span style={{fontSize:11,color:T.muted}}>Counts neighbor/table pairs after each Randomize run</span>
-              <button onClick={()=>upd(c=>({...c,sitTogether:{}}))}
-                style={{background:"none",border:`1px solid ${T.border}`,borderRadius:5,padding:"4px 8px",fontSize:11,color:T.muted}}>
-                Reset
-              </button>
-            </div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:6}}>
-            {frequencyRows.slice(0,12).map(row=>(
-              <div key={row.key} style={{display:"flex",alignItems:"center",gap:8,border:`1px solid ${T.border}`,
-                borderRadius:7,padding:"7px 9px",background:T.bg}}>
-                <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  {row.names[0].split(" ")[0]} ↔ {row.names[1].split(" ")[0]}
-                </span>
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:T.accent,fontWeight:700}}>
-                  {row.count}×
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {layout?(
         <>
-          <label style={{fontSize:12,color:T.muted,display:"flex",alignItems:"center",gap:6,marginBottom:10,cursor:"pointer",userSelect:"none"}}>
-            <input type="checkbox" checked={showR} onChange={e=>setShowR(e.target.checked)}/>
-            Show proximity radius on hover
-          </label>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
+            <ABtn onClick={run} disabled={!canRun}>{running?"Optimizing…":"⚡ Randomize"}</ABtn>
+            {result&&<ABtn onClick={openPresenter} style={{background:T.sel}}>Present</ABtn>}
+            {result&&<GBtn onClick={()=>{setResult(null);setSwapping(null);}}>Clear</GBtn>}
+            {validLocked.size>0&&<GBtn onClick={()=>setLocked(new Set())}>Unlock all</GBtn>}
+            <label style={{fontSize:12,color:T.muted,display:"flex",alignItems:"center",gap:6,cursor:"pointer",userSelect:"none",marginLeft:"auto"}}>
+              <input type="checkbox" checked={showR} onChange={e=>setShowR(e.target.checked)}/>
+              Show proximity radius on hover
+            </label>
+          </div>
           {/* Canvas */}
+          <div style={{display:"grid",gridTemplateColumns:"minmax(0, max-content) minmax(240px,320px)",gap:16,alignItems:"start"}}>
           <div className="canvas-scroll">
           <div className="canvas-stage" style={{border:`1px solid ${T.border}`,borderRadius:10,
             boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
@@ -2431,6 +2459,36 @@ function RandomizeTab({cls,upd}) {
             </svg>
           </div>
           </div>
+          <div style={{fontSize:12,color:T.dark,background:T.panel,borderRadius:7,
+            border:`1px solid ${T.border}`,padding:"10px 14px",minHeight:120}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
+              <span style={{fontSize:10,letterSpacing:2,color:T.muted}}>SIT-TOGETHER FREQUENCY</span>
+              {frequencyRows.length>0&&<button onClick={()=>upd(c=>({...c,sitTogether:{}}))}
+                style={{background:"none",border:`1px solid ${T.border}`,borderRadius:5,padding:"4px 8px",fontSize:11,color:T.muted}}>
+                Reset
+              </button>}
+            </div>
+            {frequencyRows.length>0?(
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {frequencyRows.slice(0,12).map(row=>(
+                  <div key={row.key} style={{display:"flex",alignItems:"center",gap:8,border:`1px solid ${T.border}`,
+                    borderRadius:7,padding:"7px 9px",background:T.bg}}>
+                    <span style={{flex:1,whiteSpace:"normal",overflowWrap:"anywhere"}}>
+                      {row.names[0].split(" ")[0]} ↔ {row.names[1].split(" ")[0]}
+                    </span>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:T.accent,fontWeight:700}}>
+                      {row.count}×
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ):(
+              <div style={{fontSize:11,color:T.muted,lineHeight:1.6}}>
+                Counts neighbor/table pairs after each Randomize run.
+              </div>
+            )}
+          </div>
+          </div>
 
           {!result&&<div style={{marginTop:10,fontSize:12,color:T.muted,fontStyle:"italic"}}>Click Randomize to assign students to desks.</div>}
 
@@ -2463,20 +2521,55 @@ function RandomizeTab({cls,upd}) {
 // Local `local` state lets the slider move smoothly; onChange syncs to parent.
 function SettingsSlider({value, onChange, min, max, step}) {
   const T = useT();
-  const [local, setLocal] = useState(value);
+  const normalizedValue=clamp(value,min,max);
+  const [local, setLocal] = useState(normalizedValue);
   // Sync if parent resets the value (e.g. class switch)
-  useEffect(() => { setLocal(value); }, [value]);
+  useEffect(() => { setLocal(clamp(value,min,max)); }, [value,min,max]);
+  const tickCount=Math.floor((max-min)/step)+1;
+  const showTicks=step===1&&tickCount<=11;
   return (
     // Slider layout: the rail flexes while the mono number stays fixed-width,
     // preventing the settings rows from wiggling as values change.
     <div style={{display:"flex",alignItems:"center",gap:10,width:240}}>
-      <input type="range" min={min} max={max} step={step}
-        value={local}
-        onChange={e=>{const v=+e.target.value; setLocal(v); onChange(v);}}
-        onInput={e=>{const v=+e.currentTarget.value; setLocal(v); onChange(v);}}
-        style={{flex:1,cursor:"pointer"}}/>
+      <div style={{flex:1}}>
+        <input type="range" min={min} max={max} step={step}
+          value={local}
+          onChange={e=>{const v=+e.target.value; setLocal(v); onChange(v);}}
+          onInput={e=>{const v=+e.currentTarget.value; setLocal(v); onChange(v);}}
+          style={{width:"100%",cursor:"pointer"}}/>
+        {showTicks&&(
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:-3}}>
+            {Array.from({length:tickCount},(_,i)=>min+i*step).map(tick=>(
+              <span key={tick} style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:T.muted,width:12,textAlign:"center"}}>
+                {tick}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
       <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,minWidth:32,
         textAlign:"right",color:T.dark}}>{local}</span>
+    </div>
+  );
+}
+
+function NeighborRadiusVisual({radius}) {
+  const T=useT();
+  return (
+    <div style={{width:220,background:T.panel,border:`1px solid ${T.border}`,borderRadius:8,padding:"12px 14px"}}>
+      <div style={{position:"relative",height:64,borderBottom:`1px solid ${T.border}`}}>
+        {[40,120,200,300].map(px=>(
+          <div key={px} style={{position:"absolute",left:`${((px-40)/(300-40))*100}%`,bottom:0,transform:"translateX(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+            <div style={{height:px===radius?48:28,width:1,background:px===radius?T.accent:T.border}}/>
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:px===radius?T.accent:T.muted}}>{px}</span>
+          </div>
+        ))}
+        <div style={{position:"absolute",left:0,right:0,top:18,height:1,background:T.border}}/>
+        <div style={{position:"absolute",left:0,top:18,width:`${((radius-40)/(300-40))*100}%`,height:1,background:T.accent}}/>
+      </div>
+      <div style={{fontSize:11,color:T.muted,lineHeight:1.5,marginTop:9}}>
+        The highlighted line shows the current neighbor distance in screen pixels.
+      </div>
     </div>
   );
 }
@@ -2485,6 +2578,7 @@ function SettingsSlider({value, onChange, min, max, step}) {
 function SettingsTab({cls,upd}) {
   const T=useT();
   const s=cls.settings??{};
+  const radius=s.proximityRadius??120;
   const set=(f,v)=>upd(c=>({...c,settings:{...(c.settings??{}),[f]:v}}));
   const Row=({label,desc,children})=>(
     // Settings rows use the same two-column rhythm throughout the tab: text on
@@ -2509,9 +2603,10 @@ function SettingsTab({cls,upd}) {
   );//s
   const Sec=({t})=><div style={{fontSize:10,letterSpacing:2,color:T.muted,marginTop:24,marginBottom:2}}>{t}</div>;
   const activeRules=[
-    ["Neighbor radius",`${s.proximityRadius??120}px`],
-    ["Gender separation",s.separateGenders?`On · ${s.genderWeight??50}`:"Off"],
-    ["Grade mixing",s.mixGrades?`On · ${s.gradeWeight??50}`:"Off"],
+    ["Neighbor radius",`${radius}px`],
+    ["Even groups",s.evenGroups?"On":"Off"],
+    ["Gender separation",s.separateGenders?`On · ${clamp(s.genderWeight??5,0,10)}`:"Off"],
+    ["Grade mixing",s.mixGrades?`On · ${clamp(s.gradeWeight??5,0,10)}`:"Off"],
     ["Focus Level",s.mixMentalCapacity?`${s.mentalMixMode==="homogeneous"?"Homogeneous":"Heterogeneous"} · ${s.mentalCapacityWeight??50}`:"Off"],
   ];
   return (//s
@@ -2521,18 +2616,24 @@ function SettingsTab({cls,upd}) {
         <p style={{color:T.muted,fontSize:13,marginBottom:24,lineHeight:1.6}}>Higher weights enforce constraints more strongly relative to chemistry scores.</p>
         <Sec t="PROXIMITY"/>
         <Row label="Neighbor radius" desc={`Desks within this range are "neighbors" for scoring. Currently ${s.proximityRadius??120}px.`}>
-          <Slider f="proximityRadius" min={40} max={300} step={10}/>
+          <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}}>
+            <Slider f="proximityRadius" min={40} max={300} step={10}/>
+            <NeighborRadiusVisual radius={radius}/>
+          </div>
+        </Row>
+        <Row label="Make groups even" desc="Balances occupied neighbor groups, where a group is desks inside the neighbor radius plus their connected mutuals.">
+          <Toggle f="evenGroups" label="Balance neighbor groups"/>
         </Row>
         <Sec t="GENDER"/>
         <Row label="Separate genders" desc="Penalizes same-gender neighbors. Requires gender data in Students tab.">
           <Toggle f="separateGenders" label="Enable gender separation"/>
         </Row>
-        {s.separateGenders&&<Row label="Gender penalty weight" desc="Extra penalty per same-gender pair. Raise above 100 to override chemistry."><Slider f="genderWeight" min={0} max={150} step={5}/></Row>}
+        {s.separateGenders&&<Row label="Gender penalty weight" desc="Extra penalty per same-gender pair."><Slider f="genderWeight" min={0} max={10} step={1}/></Row>}
         <Sec t="GRADE LEVEL"/>
         <Row label="Mix grade levels" desc="Penalizes same-grade neighbors, encouraging cross-grade mixing. Requires grade data.">
           <Toggle f="mixGrades" label="Encourage grade mixing"/>
         </Row>
-        {s.mixGrades&&<Row label="Grade mixing weight" desc="Extra penalty per same-grade pair."><Slider f="gradeWeight" min={0} max={150} step={5}/></Row>}
+        {s.mixGrades&&<Row label="Grade mixing weight" desc="Extra penalty per same-grade pair."><Slider f="gradeWeight" min={0} max={10} step={1}/></Row>}
         <Sec t="FOCUS LEVEL"/>
         <Row label="Mix by focus level" desc="Uses each student's 1-5 focus level from the Students tab.">
           <Toggle f="mixMentalCapacity" label="Enable mixing by focus level"/>
@@ -2561,7 +2662,7 @@ function SettingsTab({cls,upd}) {
           ))}
         </div>
         <div style={{background:T.tipBg,border:`1px solid ${T.tipBorder}`,borderRadius:8,padding:"14px 16px",fontSize:12,color:T.tipText,lineHeight:1.8}}>
-          <strong>Tip:</strong> Chemistry "Avoid" pairs contribute up to 80pts. Set constraint weights above 80 to override them. Run Randomize several times — SA is stochastic.
+          <strong>Tip:</strong> Chemistry now starts at 50, and lower-scored pairs are preferred as neighbors for relationship-building. Run Randomize several times — SA is stochastic.
         </div>
       </div>
     </div>
@@ -2609,15 +2710,15 @@ function ControlsTab({cls}) {
           <VRow label="Neighbor radius" value={`${s.proximityRadius??120}px`}
             desc="Two desks within this screen-pixel distance count as neighbors. Bigger values make more nearby pairs affect the score."/>
           <VRow label="Chemistry score" value="0-100"
-            desc="0 means never seat together, 50 means caution, and 100 means fine. Lower scores add more penalty when students are neighbors."/>
-          <VRow label="Gender separation" value={s.separateGenders?`On · ${s.genderWeight??50}`:"Off"}
+            desc="New pairs start at 50. Lower scores are prioritized as neighbors so students with strained chemistry can build better relationships."/>
+          <VRow label="Gender separation" value={s.separateGenders?`On · ${clamp(s.genderWeight??5,0,10)}`:"Off"}
             desc="When on, same-gender neighbor pairs receive an extra penalty using the M/F/X values from Students."/>
-          <VRow label="Gender weight" value={`${s.genderWeight??50}`}
-            desc="Strength of that same-gender penalty: 0 ignores it, 50 is moderate, 80 is about one strong avoid pair, and 150 is very strong."/>
-          <VRow label="Grade mixing" value={s.mixGrades?`On · ${s.gradeWeight??50}`:"Off"}
+          <VRow label="Gender weight" value={`${clamp(s.genderWeight??5,0,10)}`}
+            desc="Strength of that same-gender penalty from 0 to 10, with one-step markers in Settings."/>
+          <VRow label="Grade mixing" value={s.mixGrades?`On · ${clamp(s.gradeWeight??5,0,10)}`:"Off"}
             desc="When on, same-grade neighbor pairs receive an extra penalty so the optimizer spreads grade levels apart."/>
-          <VRow label="Grade weight" value={`${s.gradeWeight??50}`}
-            desc="Strength of the same-grade penalty. Higher values make grade mixing matter more than chemistry."/>
+          <VRow label="Grade weight" value={`${clamp(s.gradeWeight??5,0,10)}`}
+            desc="Strength of the same-grade penalty from 0 to 10, with one-step markers in Settings."/>
           <VRow label="Focus level mixing" value={s.mixMentalCapacity?`${s.mentalMixMode==="homogeneous"?"Same":"Different"} · ${s.mentalCapacityWeight??50}`:"Off"}
             desc="Uses the 1-5 focus level from Students. Homogeneous keeps similar focus levels nearby; heterogeneous spreads similar focus levels apart."/>
           <VRow label="Table capacity" value="Layout +/-"
@@ -2706,6 +2807,26 @@ function ControlsTab({cls}) {
             ))}
           </div>
         </Sec>
+      </div>
+    </div>
+  );
+}
+
+function AboutTab() {
+  const T=useT();
+  return (
+    <div style={{maxWidth:920}}>
+      <div style={{fontFamily:"'Playfair Display',serif",fontSize:28,marginBottom:10,color:T.dark}}>About Us</div>
+      <div style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:10,padding:"24px 28px",lineHeight:1.75,color:T.dark}}>
+        <p style={{fontSize:15,marginBottom:16}}>
+          SeatCraft exists to help teachers turn seating charts into a thoughtful classroom tool, not another weekly chore.
+        </p>
+        <p style={{fontSize:13,color:T.muted,marginBottom:16}}>
+          Our mission is to make classrooms easier to arrange with care: balancing learning needs, social growth, fairness, visibility, and the real constraints of a room. We believe seating should support both academic focus and healthier relationships, especially when students need a little help finding common ground.
+        </p>
+        <p style={{fontSize:13,color:T.muted}}>
+          SeatCraft is built for teacher judgment. The app suggests, organizes, and visualizes, while teachers stay in control as the school year changes and students grow.
+        </p>
       </div>
     </div>
   );
