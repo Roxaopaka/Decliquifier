@@ -359,53 +359,54 @@ const PAL = {
   mist:"#E0E0E0",
 };
 const LIGHT = {
-  // Palette-led light mode: cool slate chrome, pale mist surfaces, and olive/sage accents.
+  // SeatCraft brand palette from the August 2026 brand guide.
   bg:"#FFFFFF",
-  sidebar:"#3A606E",
-  sidebarText:"#F4F7F6",
-  sidebarMuted:"rgba(244,247,246,.58)",
-  sidebarSubtle:"rgba(224,224,224,.14)",
-  canvas:"#FAFBF8",
+  sidebar:"#FFFFFF",
+  sidebarText:"#1B2A4A",
+  sidebarMuted:"#6B7280",
+  sidebarSubtle:"#F4F6F8",
+  canvas:"#F4F6F8",
   panel:"#FFFFFF",
-  dark:"#233B43",
-  accent:"#607B7D",
-  accentLt:"#EEF1EA",
-  border:"#C9D0C7",
-  muted:"#4F666A",
-  chip:"#DDE0D3",
-  sel:"#3A606E",
-  selLt:"rgba(58,96,110,.13)",
-  grid:"#AAAE8E",
-  board:"#3A606E",
-  tipBg:"#EEF1EA",
-  tipBorder:"#AAAE8E",
-  tipText:"#3A606E",
+  dark:"#1B2A4A",
+  accent:"#1E9E92",
+  accentLt:"rgba(30,158,146,.10)",
+  amber:"#F5A623",
+  border:"#E5E7EB",
+  muted:"#6B7280",
+  chip:"#F4F6F8",
+  sel:"#1E9E92",
+  selLt:"rgba(30,158,146,.13)",
+  grid:"#6B7280",
+  board:"#1B2A4A",
+  tipBg:"#F4F6F8",
+  tipBorder:"#1E9E92",
+  tipText:"#1B2A4A",
   gMale:"#F97316",gFemale:"#8B5CF6",gOther:"#828E82",
-  grades:["#3A606E","#607B7D","#828E82","#AAAE8E","#526F67","#75816F","#4C6C7A","#979B7C"],
+  grades:["#1B2A4A","#1E9E92","#F5A623","#2B2E33","#6B7280","#4C7C9A","#2F6F68","#A66B00"],
   isDark:false,
 };
 const DARK = {
-  // Dark mode inverts the requested palette into deep contrast without leaving the color family.
-  bg:"#12191B",
-  sidebar:"#0B1214",
-  sidebarText:"#E0E0E0",
-  sidebarMuted:"rgba(224,224,224,.55)",
-  sidebarSubtle:"rgba(224,224,224,.10)",
-  canvas:"#182224",
-  panel:"#202C2F",
-  dark:"#E0E0E0",
-  accent:"#AAAE8E",
-  accentLt:"#2E382F",
-  border:"#3A4A4D",
-  muted:"#A7B3AF",
-  chip:"#34403B",
-  sel:"#E0E0E0",
-  selLt:"rgba(224,224,224,.14)",
-  grid:"#607B7D",
-  board:"#0B1214",
-  tipBg:"#243130",
-  tipBorder:"#607B7D",
-  tipText:"#E0E0E0",
+  bg:"#101827",
+  sidebar:"#0B1220",
+  sidebarText:"#FFFFFF",
+  sidebarMuted:"rgba(255,255,255,.62)",
+  sidebarSubtle:"rgba(255,255,255,.08)",
+  canvas:"#172033",
+  panel:"#162238",
+  dark:"#FFFFFF",
+  accent:"#1E9E92",
+  accentLt:"rgba(30,158,146,.18)",
+  amber:"#F5A623",
+  border:"#2B3A55",
+  muted:"#B9C0CC",
+  chip:"#22304A",
+  sel:"#1E9E92",
+  selLt:"rgba(30,158,146,.18)",
+  grid:"#6B7280",
+  board:"#0B1220",
+  tipBg:"#172033",
+  tipBorder:"#1E9E92",
+  tipText:"#FFFFFF",
   gMale:"#F97316",gFemale:"#8B5CF6",gOther:"#9BA89C",
   grades:["#84A6B3","#A7B3AF","#9BA89C","#C8CCA4","#6F8F92","#B1B68F","#7495A2","#8B9A88"],
   isDark:true,
@@ -436,21 +437,18 @@ const gridPattern = (T,snap=false) => svgDataUrl(snap
 
 // ─── global styles ────────────────────────────────────────────────────────────
 const mkStyles = T => `
-  /* Typography: Playfair is reserved for SeatCraft/title moments; DM Sans keeps
-     dense tools readable; DM Mono is used only where numbers/keyboard labels
-     benefit from equal-width characters. */
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap');
   /* Global reset keeps inline component boxes predictable because this app uses
      many hand-sized controls instead of a separate CSS component library. */
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{background:${T.bg};font-family:'DM Sans',sans-serif}
+  body{background:${T.bg};font-family:'Arial', 'Helvetica Neue', sans-serif}
   /* Thin scrollbars help long student/class lists stay compact and tool-like. */
   ::-webkit-scrollbar{width:4px;height:4px}
   ::-webkit-scrollbar-thumb{background:${T.muted};border-radius:2px}
   /* Form and button defaults inherit the app font so native controls do not
      visually drift from the custom inline-styled controls. */
-  button{cursor:pointer;font-family:'DM Sans',sans-serif}
-  input,select,textarea{font-family:'DM Sans',sans-serif}
+  button{cursor:pointer;font-family:'Poppins', 'Segoe UI', sans-serif;font-weight:600}
+  input,select,textarea{font-family:'Arial', 'Helvetica Neue', sans-serif}
   /* Range and checkbox controls borrow the current theme accent, which makes
      sliders, toggles, and randomized chemistry controls feel connected. */
   input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;accent-color:${T.accent};cursor:pointer;width:100%;height:28px;touch-action:none}
@@ -475,14 +473,18 @@ const mkStyles = T => `
   .preset-btn:hover{background:${T.accentLt}!important;border-color:${T.accent}!important;color:${T.accent}!important}
   .shape-btn:hover{opacity:1!important}
   .app-shell{display:flex;height:100vh;background:${T.bg};color:${T.dark}}
-  .app-sidebar{width:210px;background:${T.sidebar};color:${T.sidebarText};display:flex;flex-direction:column;padding:28px 14px 18px;flex-shrink:0}
+  .app-sidebar{width:210px;background:${T.sidebar};color:${T.sidebarText};display:flex;flex-direction:column;padding:24px 14px 18px;flex-shrink:0;border-right:1px solid ${T.border}}
   .app-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
   .class-header{padding:22px 28px 0;border-bottom:1px solid ${T.border};flex-shrink:0}
   .tab-strip{display:flex;gap:2px;overflow-x:auto}
   .class-content{flex:1;overflow:auto;padding:24px 28px;background:${T.bg}}
-  .layout-shell{display:flex;gap:20px;flex-wrap:wrap}
-  .layout-rail{width:160px;flex-shrink:0}
-  .canvas-column{flex:1;min-width:0}
+  .layout-shell{display:grid;grid-template-columns:164px minmax(560px,1fr) 230px;gap:20px;align-items:start}
+  .layout-topbar{grid-column:1/-1;background:${T.panel};border:1px solid ${T.border};border-radius:8px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .shape-rail{grid-column:1;grid-row:2;width:164px;background:${T.panel};border:1px solid ${T.border};border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px;position:relative}
+  .shape-tile{height:64px;border-radius:6px;border:1px solid ${T.border};background:${T.bg};display:flex;align-items:center;justify-content:center;color:${T.dark}}
+  .formation-popover{position:absolute;left:178px;top:0;width:min(560px,calc(100vw - 520px));background:${T.panel};border:1px solid ${T.border};border-radius:8px;box-shadow:0 18px 45px rgba(27,42,74,.16);padding:14px;z-index:40}
+  .layout-rail{grid-column:3;grid-row:2;width:230px;flex-shrink:0;background:${T.panel};border:1px solid ${T.border};border-radius:8px;padding:12px;min-height:${CH + 22}px}
+  .canvas-column{grid-column:2;grid-row:2;min-width:0}
   .canvas-scroll{max-width:100%;overflow:auto;padding:2px 2px 10px;-webkit-overflow-scrolling:touch}
   .canvas-stage{position:relative;width:${CW}px;height:${CH}px}
   .students-shell{display:grid;grid-template-columns:minmax(280px,330px) minmax(320px,1fr) minmax(260px,.8fr);gap:24px;align-items:flex-start}
@@ -509,7 +511,8 @@ const mkStyles = T => `
     .tab-strip{gap:0;padding-bottom:2px}
     .tab-btn{flex:0 0 auto;padding:9px 13px!important;font-size:12px!important}
     .layout-shell{display:block}
-    .layout-rail{width:100%;margin-bottom:14px}
+    .layout-topbar,.shape-rail,.layout-rail{width:100%;margin-bottom:14px}
+    .formation-popover{position:static;width:100%;margin-top:8px}
     .canvas-column{width:100%}
     .canvas-scroll{border-radius:10px;background:${T.panel};border:1px solid ${T.border}}
     .students-shell,.chemistry-shell,.settings-shell,.controls-grid{display:block}
@@ -583,7 +586,7 @@ function TutorialModal({onDone}) {
       <div className="tut-card" style={{background:T.panel,borderRadius:16,padding:"36px 32px",width:380,
         boxShadow:"0 16px 48px rgba(0,0,0,.25)",textAlign:"center"}}>
         <div style={{fontSize:46,marginBottom:12}}>🪑</div>
-        <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:T.dark,marginBottom:10}}>Welcome to SeatCraft</div>
+        <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:22,color:T.dark,marginBottom:10}}>Welcome to SeatCraft</div>
         <p style={{fontSize:13,color:T.muted,lineHeight:1.7,marginBottom:26}}>First time here? Would you like a quick tour?</p>
         <div style={{display:"flex",gap:10}}>
           <ABtn onClick={()=>setStep(0)}>Yes, show me around</ABtn>
@@ -602,7 +605,7 @@ function TutorialModal({onDone}) {
             background:i===step?T.accent:T.border,transition:"background .2s"}}/>)}
         </div>
         <div style={{fontSize:38,textAlign:"center",marginBottom:12}}>{s.icon}</div>
-        <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,textAlign:"center",color:T.dark,marginBottom:10}}>{s.title}</div>
+        <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:18,textAlign:"center",color:T.dark,marginBottom:10}}>{s.title}</div>
         <p style={{fontSize:13,color:T.muted,textAlign:"center",lineHeight:1.7,marginBottom:24}}>{s.text}</p>
         <div style={{display:"flex",gap:10,justifyContent:"center"}}>
           {step>0&&<GBtn onClick={()=>setStep(s=>s-1)}>← Back</GBtn>}
@@ -633,19 +636,35 @@ function LoginField({label,type,value,onChange,onEnter,placeholder}) {
   );
 }
 
-function SeatCraftLogo({size=34,color="currentColor",style={}}) {
+function SeatCraftLogo({size=34,style={}}) {
+  const cell=size/4.8;
+  const gap=cell*.28;
+  const start=(size-(cell*3+gap*2))/2;
+  const pos=n=>start+n*(cell+gap);
   return (
-    <svg viewBox="0 0 72 72" aria-hidden="true" focusable="false"
-      style={{width:size,height:size,display:"block",color,...style}}>
-      <g fill="none" stroke="currentColor" strokeWidth={5.5} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M24 58 L29 33"/>
-        <path d="M48 58 V36"/>
-        <path d="M63 58 L60 36"/>
-        <path d="M27 34 H59 Q66 34 66 40 Q66 46 59 46 H26"/>
-        <path d="M30 33 L22 12 Q21 8 25 6 Q39 1 52 8 Q61 13 63 25 Q64 29 64 34"/>
-        <path d="M23 13 Q39 22 32 46"/>
-      </g>
+    <svg viewBox={`0 0 ${size} ${size}`} aria-hidden="true" focusable="false"
+      style={{width:size,height:size,display:"block",...style}}>
+      {[0,1,2].map(r=>[0,1,2].map(c=>{
+        const fill=r===1&&c===1?"#1E9E92":r===0&&c===2?"#1E9E92":"#050505";
+        return <rect key={`${r}-${c}`} x={pos(c)} y={pos(r)} width={cell} height={cell} rx={cell*.22} fill={fill}/>;
+      }))}
+      <path d={`M ${pos(2)+cell*.62} ${pos(0)-cell*.1} C ${pos(2)+cell*1.15} ${pos(0)+cell*.28}, ${pos(2)+cell*1.1} ${pos(0)+cell*.82}, ${pos(2)+cell*.58} ${pos(0)+cell*1.06}`}
+        fill="none" stroke="#F5A623" strokeWidth={Math.max(2,size*.075)} strokeLinecap="round"/>
+      <path d={`M ${pos(2)+cell*.9} ${pos(0)-cell*.05} L ${pos(2)+cell*1.18} ${pos(0)+cell*.26} L ${pos(2)+cell*.78} ${pos(0)+cell*.33} Z`}
+        fill="#F5A623"/>
     </svg>
+  );
+}
+
+function SeatCraftWordmark({compact=false}) {
+  const T=useT();
+  return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:compact?"center":"flex-start",gap:10,minWidth:0}}>
+      <SeatCraftLogo size={compact?30:38}/>
+      <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontWeight:700,fontSize:compact?21:30,lineHeight:1,whiteSpace:"nowrap"}}>
+        <span style={{color:T.dark}}>Seat</span><span style={{color:T.accent}}>Craft</span>
+      </div>
+    </div>
   );
 }
 
@@ -685,10 +704,7 @@ function LoginPage({onLogin}) {
       <div className="login-card" style={{width:360,background:T.panel,borderRadius:16,
         border:`1px solid ${T.border}`,padding:"40px 36px",boxShadow:"0 8px 32px rgba(0,0,0,.1)"}}>
         <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:4}}>
-            <SeatCraftLogo size={42} color={T.accent}/>
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:30,color:T.dark}}>SeatCraft</div>
-          </div>
+          <SeatCraftWordmark/>
           <div style={{fontSize:10,letterSpacing:3,color:T.muted}}>CLASSROOM SEATING</div>
         </div>
         <div style={{display:"flex",background:T.bg,borderRadius:8,padding:3,marginBottom:26}}>
@@ -827,11 +843,10 @@ export default function App() {
       <div className="app-shell">
         {/* Sidebar */}
         <aside className="app-sidebar">
-          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:2,width:"100%"}}>
-            <SeatCraftLogo size={30} color={T.isDark?T.accent:T.sidebarText}/>
-            <div style={{fontFamily:"'Barlow Condensed',serif",fontSize:21,lineHeight:1}}>SeatCraft</div>
+          <div style={{marginBottom:8,width:"100%"}}>
+            <SeatCraftWordmark compact/>
           </div>
-          <div style={{fontSize:9,letterSpacing:2,opacity:.3,marginBottom:8,textAlign:"center"}}>CLASSROOM SEATING</div>
+          <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:9,letterSpacing:2,color:T.sidebarMuted,marginBottom:8,textAlign:"center"}}>CLASSROOM SEATING</div>
           <div style={{fontSize:10,color:T.sidebarMuted,marginBottom:18,overflow:"hidden",
             textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={teacher}>{teacher}</div>
           <div style={{fontSize:9,letterSpacing:2,opacity:.3,marginBottom:10}}>CLASSES</div>
@@ -891,14 +906,14 @@ export default function App() {
 function Spinner() {
   const T=useT();
   return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",
-    background:T.bg,color:T.muted,fontFamily:"'DM Mono',monospace",fontSize:13}}>Loading…</div>;
+    background:T.bg,color:T.muted,fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:13}}>Loading…</div>;
 }
 function EmptyState({onAdd}) {
   const T=useT();
   return (
     <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,height:"100%"}}>
       <div style={{fontSize:52,opacity:.1}}>🪑</div>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,color:T.muted}}>No class selected</div>
+      <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:22,color:T.muted}}>No class selected</div>
       <ABtn onClick={onAdd}>Create your first class</ABtn>
     </div>
   );
@@ -912,7 +927,7 @@ function ClassView({cls,tab,setTab,upd,savedLayouts,setSavedLayouts}) {
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%",minHeight:0}}>
       <div className="class-header">
-        <div style={{fontFamily:"'Playfair Display',serif",fontSize:24,marginBottom:14,color:T.dark}}>{cls.name}</div>
+        <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:24,marginBottom:14,color:T.dark}}>{cls.name}</div>
         <div className="tab-strip">
           {TABS.map(t=>(
             <button key={t} className="tab-btn" onClick={()=>setTab(t)}
@@ -967,6 +982,7 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
   const [ctxMenu,setCtxMenu]   = useState(null);
   const [addingLyt,setAddLyt]  = useState(false);
   const [newLytName,setLytNm]  = useState("");
+  const [showFormations,setShowFormations] = useState(false);
   const addLytRef = useRef();
 
   useEffect(()=>{if(addingLyt)addLytRef.current?.focus();},[addingLyt]);
@@ -1212,6 +1228,88 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
 
   return (
     <div className="layout-shell">
+      {active&&(
+        <div className="layout-topbar">
+          <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,cursor:"pointer",userSelect:"none",
+            background:snapOn?T.accentLt:T.panel,border:`1px solid ${snapOn?T.accent:T.border}`,
+            borderRadius:6,padding:"7px 10px",color:snapOn?T.accent:T.muted}}>
+            <input type="checkbox" checked={snapOn} onChange={e=>setSnapOn(e.target.checked)} style={{margin:0}}/> Snap
+          </label>
+          <button onClick={undo} disabled={!canUndo} title="Undo"
+            style={{background:"none",border:`1px solid ${T.border}`,borderRadius:6,padding:"7px 11px",fontSize:13,color:canUndo?T.dark:T.border,cursor:canUndo?"pointer":"default"}}>
+            Undo
+          </button>
+          <button onClick={redo} disabled={!canRedo} title="Redo"
+            style={{background:"none",border:`1px solid ${T.border}`,borderRadius:6,padding:"7px 11px",fontSize:13,color:canRedo?T.dark:T.border,cursor:canRedo?"pointer":"default"}}>
+            Redo
+          </button>
+          {active.seats.length>0&&<button onClick={clearAll} style={{background:"none",border:`1px solid ${T.border}`,color:T.muted,padding:"7px 11px",borderRadius:6,fontSize:12}}>Clear</button>}
+          <div style={{width:1,height:24,background:T.border}}/>
+          <button className="preset-btn" onClick={()=>updRef.current(c=>({...c,layouts:{...c.layouts,[active.id]:{...active,roomPoly:DEFAULT_ROOM()}}}))}
+            style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:6,padding:"7px 11px",fontSize:12,color:T.dark}}>
+            Reset room
+          </button>
+          <button onClick={()=>{
+            const poly=active.roomPoly??DEFAULT_ROOM();
+            const xs=poly.map(p=>p.x),ys=poly.map(p=>p.y);
+            const isLandscape=(Math.max(...xs)-Math.min(...xs))>=(Math.max(...ys)-Math.min(...ys));
+            updRef.current(c=>({...c,layouts:{...c.layouts,[active.id]:{...active,roomPoly:isLandscape?[
+              {x:Math.round(CW/2-155),y:20},{x:Math.round(CW/2+155),y:20},{x:Math.round(CW/2+155),y:CH-20},{x:Math.round(CW/2-155),y:CH-20},
+            ]:DEFAULT_ROOM()}}}));
+          }} style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:6,padding:"7px 11px",fontSize:12,color:T.dark}}>
+            Orientation
+          </button>
+          <button onClick={()=>{setEditPoly(v=>!v);setPlacingVtx(false);}}
+            style={{background:editPoly?T.accent:T.panel,border:`1px solid ${editPoly?T.accent:T.border}`,
+              borderRadius:6,padding:"7px 11px",fontSize:12,color:editPoly?"#fff":T.dark}}>
+            {editPoly?"Done vertices":"Room vertices"}
+          </button>
+          {editPoly&&<>
+            <button onClick={addVtx}
+              style={{background:placingVtx?T.accent:T.panel,border:`1px solid ${placingVtx?T.accent:T.border}`,
+                borderRadius:6,padding:"7px 11px",fontSize:12,color:placingVtx?"#fff":T.dark}}>
+              {placingVtx?"Place vertex":"+ Vertex"}
+            </button>
+            <button onClick={rmVtx} disabled={(active.roomPoly??[]).length<=3}
+              style={{background:"none",border:`1px solid ${T.border}`,borderRadius:6,padding:"7px 11px",fontSize:12,
+                color:(active.roomPoly??[]).length<=3?T.border:T.dark}}>− Vertex</button>
+          </>}
+          <span style={{fontSize:11,color:T.muted,marginLeft:"auto"}}>
+            {active.seats.length} desk{active.seats.length!==1?"s":""} · {totalCapacity} seat{totalCapacity!==1?"s":""}{selected.size?` · ${selected.size} selected`:""}
+          </span>
+        </div>
+      )}
+      <div className="shape-rail">
+        <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:10,letterSpacing:1.6,color:T.muted}}>DESK SHAPES</div>
+        {DESK_SHAPES.map(s=>(
+          <button key={s.id} className="shape-tile" title={s.label} onClick={()=>setShape(s.id)}
+            style={{borderColor:activeShape===s.id?T.accent:T.border,background:activeShape===s.id?T.accentLt:T.bg,color:activeShape===s.id?T.accent:T.dark}}>
+            <span style={{fontSize:28,lineHeight:1}}>{s.icon}</span>
+          </button>
+        ))}
+        <div style={{height:1,background:T.border,margin:"2px 0"}}/>
+        <button onClick={()=>setShowFormations(v=>!v)}
+          style={{minHeight:72,display:"flex",alignItems:"stretch",padding:0,overflow:"hidden",
+            background:showFormations?T.accentLt:T.bg,border:`1px solid ${showFormations?T.accent:T.border}`,
+            borderRadius:6,color:showFormations?T.accent:T.dark}}>
+          <span style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>Formations</span>
+          <span style={{width:28,borderLeft:`1px solid ${showFormations?T.accent:T.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>→</span>
+        </button>
+        {showFormations&&(
+          <div className="formation-popover">
+            <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:11,letterSpacing:1.4,color:T.muted,marginBottom:12}}>FORMATIONS</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8}}>
+              {TABLE_PRESETS.map(p=>(
+                <button key={p.id} onClick={()=>{applyPreset(p.id);setShowFormations(false);}}
+                  style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:6,padding:"10px 8px",color:T.dark,textAlign:"left",fontSize:12}}>
+                  <span style={{display:"block",color:T.accent,fontSize:10,marginBottom:4}}>{p.cat}</span>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
       {/* Layout list: narrow left rail keeps layout switching separate from the
           canvas tools, using bordered rows that mirror the class list pattern. */}
       <div className="layout-rail">
@@ -1268,7 +1366,7 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
             {/* Toolbar row 1: compact design controls. Shape buttons are grouped
                 as a segmented control; Snap is a labeled toggle; Formation is a
                 native select because it contains many grouped options. */}
-            <div style={{display:"flex",flexWrap:"wrap",gap:7,alignItems:"center",marginBottom:7}}>
+            <div style={{display:"none"}}>
               {/* Shape picker */}
               <div style={{display:"flex",gap:2,background:T.bg,borderRadius:7,padding:3,border:`1px solid ${T.border}`}}>
                 {DESK_SHAPES.map(s=>(
@@ -1328,7 +1426,7 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
                     onChange={e=>{const t=+e.target.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,rotation:t}:d));}}
                     onInput={e=>{const t=+e.currentTarget.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,rotation:t}:d));}}
                     style={{width:130,cursor:"pointer"}}/>
-                  <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,minWidth:36,color:T.dark}}>{commonRot}°</span>
+                  <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:12,minWidth:36,color:T.dark}}>{commonRot}°</span>
                   <button onClick={()=>rotateSel(90)}
                     style={{background:"none",border:`1px solid ${T.border}`,borderRadius:5,padding:"3px 8px",fontSize:11,color:T.dark}}>+90°</button>
                   <button onClick={()=>applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,rotation:0}:d))}
@@ -1344,7 +1442,7 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
                     onChange={e=>{const t=+e.target.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:t}:d));}}
                     onInput={e=>{const t=+e.currentTarget.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:t}:d));}}
                     style={{width:130,cursor:"pointer"}}/>
-                  <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,minWidth:36,color:T.dark}}>×{commonScale.toFixed(1)}</span>
+                  <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:12,minWidth:36,color:T.dark}}>×{commonScale.toFixed(1)}</span>
                   <button onClick={()=>applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:1}:d))}
                     style={{background:"none",border:`1px solid ${T.border}`,borderRadius:5,padding:"3px 8px",fontSize:11,color:T.dark}}>↺</button>
                 </div>
@@ -1354,7 +1452,7 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
             {/* Room toolbar: room-shape controls are separated from desk controls
                 so teachers can distinguish "edit the classroom boundary" from
                 "edit the tables inside it." */}
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,alignItems:"center",marginBottom:8}}>
+            <div style={{display:"none"}}>
               <span style={{fontSize:10,letterSpacing:2,color:T.muted}}>ROOM:</span>
               {/* Reset to full rectangle */}
               <button className="preset-btn"
@@ -1501,7 +1599,7 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
         ):(
           <div style={{width:CW,height:CH,display:"flex",alignItems:"center",justifyContent:"center",
             background:T.panel,borderRadius:10,border:`1px dashed ${T.border}`,flexDirection:"column",gap:12}}>
-            <div style={{opacity:.3,fontFamily:"'Playfair Display',serif",fontSize:18,color:T.dark}}>No layout selected</div>
+            <div style={{opacity:.3,fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:18,color:T.dark}}>No layout selected</div>
             <ABtn onClick={()=>setAddLyt(true)}>Create a layout</ABtn>
           </div>
         )}
@@ -1565,7 +1663,7 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
     <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
       justifyContent:"center",pointerEvents:"none",zIndex:2}}>
       {filled ? (
-        <span style={{fontFamily:"'DM Sans',sans-serif",display:"flex",flexDirection:"column",
+        <span style={{fontFamily:"'Arial', 'Helvetica Neue', sans-serif",display:"flex",flexDirection:"column",
           alignItems:"center",justifyContent:"center",gap:2,
           fontSize: Math.max(5, (assignedStudents.length>1?6.8:8.5) * Math.min(sc, 1.8)),
           fontWeight:500, color:"#fff", textAlign:"center",
@@ -1594,7 +1692,7 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
           })}
         </span>
       ) : (
-        <span style={{fontFamily:"'DM Mono',monospace",
+        <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",
           fontSize: Math.max(5, 8 * Math.min(sc, 1.8)),
           color: isSelected ? T.sel : T.muted, textAlign:"center", lineHeight:1.25}}>
           <span style={{display:"block"}}>desk</span>
@@ -1630,7 +1728,7 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
         onClick={()=>onCapacityChange(seat.id,-1)}
         style={{width:18,height:18,border:"none",background:"none",color:capacity<=1?T.border:T.muted,
           fontSize:13,lineHeight:"18px",padding:0,cursor:capacity<=1?"default":"pointer"}}>−</button>
-      <span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:T.dark,minWidth:14,textAlign:"center"}}>
+      <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:10,color:T.dark,minWidth:14,textAlign:"center"}}>
         {capacity}
       </span>
       <button title="Increase table capacity"
@@ -1706,7 +1804,7 @@ function CtxMenu({x,y,sid,hasSel,hasClip,onClose,onDelete,onDupe,onCopy,onPaste,
     <div className="ctx-item" onMouseDown={e=>{e.stopPropagation();if(!disabled){onClick();onClose();}}}
       style={{padding:"8px 14px",fontSize:12,display:"flex",justifyContent:"space-between",gap:20,
         cursor:disabled?"default":"pointer",color:disabled?T.muted:danger?"#E53E3E":T.dark,background:"transparent",userSelect:"none"}}>
-      <span>{label}</span>{sc&&<span style={{color:T.muted,fontFamily:"'DM Mono',monospace",fontSize:10}}>{sc}</span>}
+      <span>{label}</span>{sc&&<span style={{color:T.muted,fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:10}}>{sc}</span>}
     </div>
   );
   const Sep=()=><div style={{height:1,background:T.border,margin:"3px 0"}}/>;
@@ -1809,7 +1907,7 @@ function StudentsTab({cls,upd}) {
           <textarea value={raw} onChange={e=>setRaw(e.target.value)}
             placeholder={"Alice Johnson\nBob Smith\nCarla Davis\n..."}
             style={{width:"100%",height:220,border:`1px solid ${T.border}`,borderRadius:8,padding:14,
-              fontSize:13,fontFamily:"'DM Mono',monospace",background:T.panel,resize:"vertical",
+              fontSize:13,fontFamily:"'Liberation Mono', 'Courier New', monospace",background:T.panel,resize:"vertical",
               outline:"none",lineHeight:1.9,color:T.dark}}/>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,gap:8}}>
             <span style={{fontSize:12,color:T.muted}}>{cnt} student{cnt!==1?"s":""}</span>
@@ -1886,25 +1984,25 @@ function StudentsTab({cls,upd}) {
             <div style={{marginTop:14,display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8}}>
               <div style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px"}}>
                 <div style={{fontSize:9,letterSpacing:1.5,color:T.muted,marginBottom:4}}>WITH GRADE</div>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:T.dark}}>
+                <div style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:18,color:T.dark}}>
                   {cls.students.filter(s=>cls.studentMeta?.[s]?.grade).length}
                 </div>
               </div>
               <div style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px"}}>
                 <div style={{fontSize:9,letterSpacing:1.5,color:T.muted,marginBottom:4}}>WITH GENDER</div>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:T.dark}}>
+                <div style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:18,color:T.dark}}>
                   {cls.students.filter(s=>cls.studentMeta?.[s]?.gender).length}
                 </div>
               </div>
               <div style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",gridColumn:"1 / -1"}}>
                 <div style={{fontSize:9,letterSpacing:1.5,color:T.muted,marginBottom:4}}>WITH FOCUS LEVEL</div>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:T.dark}}>
+                <div style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:18,color:T.dark}}>
                   {cls.students.filter(s=>mentalCapacityValue(cls.studentMeta?.[s])!==null).length}
                 </div>
               </div>
               <div style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",gridColumn:"1 / -1"}}>
                 <div style={{fontSize:9,letterSpacing:1.5,color:T.muted,marginBottom:4}}>WITH LEARNING SUPPORT</div>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color:T.dark}}>
+                <div style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:18,color:T.dark}}>
                   {cls.students.filter(s=>needsLearningSupport(cls.studentMeta?.[s])).length}
                 </div>
               </div>
@@ -1968,7 +2066,7 @@ function ChemistryTab({cls,upd}) {
               <>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:T.muted}}>
                   <span>Chemistry</span>
-                  <span style={{fontFamily:"'DM Mono',monospace",color:col,fontWeight:700}}>{v}</span>
+                  <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",color:col,fontWeight:700}}>{v}</span>
                 </div>
                 <input type="range" min={0} max={100} step={5} value={v}
                   onChange={e=>setChem(directA,directB,+e.target.value)}
@@ -2072,7 +2170,7 @@ function ChemistryTab({cls,upd}) {
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                     <span style={{fontSize:10,color:T.muted}}>Chemistry</span>
-                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:col,fontWeight:700}}>{v}</span>
+                    <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:13,color:col,fontWeight:700}}>{v}</span>
                   </div>
                   <input type="range" min={0} max={100} step={5} value={v}
                     onChange={e=>setChem(editing.a,editing.b,+e.target.value)}
@@ -2102,7 +2200,7 @@ function ChemistryTab({cls,upd}) {
           ].map(([label,value,color])=>(
             <div key={label} style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 8px",textAlign:"center"}}>
               <div style={{fontSize:9,letterSpacing:1.4,color:T.muted,marginBottom:4}}>{label}</div>
-              <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,color,fontWeight:700}}>{value}</div>
+              <div style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:18,color,fontWeight:700}}>{value}</div>
             </div>
           ))}
         </div>
@@ -2123,7 +2221,7 @@ function ChemistryTab({cls,upd}) {
               <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {p.a.split(" ")[0]} ↔ {p.b.split(" ")[0]}
               </span>
-              <span style={{fontFamily:"'DM Mono',monospace",color:chemCol(p.v),fontWeight:700}}>{p.v}</span>
+              <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",color:chemCol(p.v),fontWeight:700}}>{p.v}</span>
             </button>
           ))}
           {!pairValues.length&&<div style={{fontSize:12,color:T.muted}}>No chemistry pairs yet.</div>}
@@ -2158,7 +2256,7 @@ function PresenterView({cls,layout,result,studentMeta,allGrades,locked,showStude
       color:T.dark,display:"flex",flexDirection:"column",alignItems:"center",padding:"28px 28px 22px"}}>
       <div style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,marginBottom:18}}>
         <div>
-          <div style={{fontFamily:"'Playfair Display',serif",fontSize:34,lineHeight:1,color:T.dark}}>{cls.name}</div>
+          <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:34,lineHeight:1,color:T.dark}}>{cls.name}</div>
           <div style={{fontSize:12,letterSpacing:2,color:T.muted,marginTop:8,textTransform:"uppercase"}}>
             {layout.name} seating chart
           </div>
@@ -2476,7 +2574,7 @@ function RandomizeTab({cls,upd}) {
                     <span style={{flex:1,whiteSpace:"normal",overflowWrap:"anywhere"}}>
                       {row.names[0].split(" ")[0]} ↔ {row.names[1].split(" ")[0]}
                     </span>
-                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:T.accent,fontWeight:700}}>
+                    <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:12,color:T.accent,fontWeight:700}}>
                       {row.count}×
                     </span>
                   </div>
@@ -2540,14 +2638,14 @@ function SettingsSlider({value, onChange, min, max, step}) {
         {showTicks&&(
           <div style={{display:"flex",justifyContent:"space-between",marginTop:-3}}>
             {Array.from({length:tickCount},(_,i)=>min+i*step).map(tick=>(
-              <span key={tick} style={{fontFamily:"'DM Mono',monospace",fontSize:8,color:T.muted,width:12,textAlign:"center"}}>
+              <span key={tick} style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:8,color:T.muted,width:12,textAlign:"center"}}>
                 {tick}
               </span>
             ))}
           </div>
         )}
       </div>
-      <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,minWidth:32,
+      <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:12,minWidth:32,
         textAlign:"right",color:T.dark}}>{local}</span>
     </div>
   );
@@ -2561,7 +2659,7 @@ function NeighborRadiusVisual({radius}) {
         {[40,120,200,300].map(px=>(
           <div key={px} style={{position:"absolute",left:`${((px-40)/(300-40))*100}%`,bottom:0,transform:"translateX(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
             <div style={{height:px===radius?48:28,width:1,background:px===radius?T.accent:T.border}}/>
-            <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:px===radius?T.accent:T.muted}}>{px}</span>
+            <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:9,color:px===radius?T.accent:T.muted}}>{px}</span>
           </div>
         ))}
         <div style={{position:"absolute",left:0,right:0,top:18,height:1,background:T.border}}/>
@@ -2612,7 +2710,7 @@ function SettingsTab({cls,upd}) {
   return (//s
     <div className="settings-shell">
       <div>
-        <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,marginBottom:4,color:T.dark}}>Randomization Settings</div>
+        <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:20,marginBottom:4,color:T.dark}}>Randomization Settings</div>
         <p style={{color:T.muted,fontSize:13,marginBottom:24,lineHeight:1.6}}>Higher weights enforce constraints more strongly relative to chemistry scores.</p>
         <Sec t="PROXIMITY"/>
         <Row label="Neighbor radius" desc={`Desks within this range are "neighbors" for scoring. Currently ${s.proximityRadius??120}px.`}>
@@ -2657,7 +2755,7 @@ function SettingsTab({cls,upd}) {
           {activeRules.map(([label,value])=>(
             <div key={label} style={{display:"flex",justifyContent:"space-between",gap:12,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px"}}>
               <span style={{fontSize:12,color:T.dark}}>{label}</span>
-              <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:T.accent,fontWeight:700}}>{value}</span>
+              <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:12,color:T.accent,fontWeight:700}}>{value}</span>
             </div>
           ))}
         </div>
@@ -2684,7 +2782,7 @@ function ControlsTab({cls}) {
       <div style={{display:"flex",gap:4,minWidth:180,flexWrap:"wrap"}}>
         {keys.map((k,i)=>(
           <kbd key={i} style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:5,
-            padding:"3px 8px",fontFamily:"'DM Mono',monospace",fontSize:11,color:T.dark,
+            padding:"3px 8px",fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:11,color:T.dark,
             boxShadow:"0 1px 2px rgba(0,0,0,.1)",whiteSpace:"nowrap"}}>{k}</kbd>
         ))}
       </div>
@@ -2695,14 +2793,14 @@ function ControlsTab({cls}) {
     <div style={{display:"grid",gridTemplateColumns:"minmax(140px,180px) minmax(70px,90px) 1fr",
       gap:12,alignItems:"start",padding:"10px 0",borderBottom:`1px solid ${T.border}`}}>
       <span style={{fontSize:13,color:T.dark,fontWeight:500}}>{label}</span>
-      <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:T.accent,fontWeight:700}}>{value}</span>
+      <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:12,color:T.accent,fontWeight:700}}>{value}</span>
       <span style={{fontSize:12,color:T.muted,lineHeight:1.55}}>{desc}</span>
     </div>
   );
 
   return (
     <div style={{width:"100%"}}>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,marginBottom:6,color:T.dark}}>Controls Reference</div>
+      <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:22,marginBottom:6,color:T.dark}}>Controls Reference</div>
       <p style={{color:T.muted,fontSize:13,marginBottom:28,lineHeight:1.6}}>Keyboard shortcuts, interaction patterns, and randomizer value meanings in one place.</p>
 
       <div className="controls-grid">
@@ -2815,17 +2913,17 @@ function ControlsTab({cls}) {
 function AboutTab() {
   const T=useT();
   return (
-    <div style={{maxWidth:920}}>
-      <div style={{fontFamily:"'Playfair Display',serif",fontSize:28,marginBottom:10,color:T.dark}}>About Us</div>
-      <div style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:10,padding:"24px 28px",lineHeight:1.75,color:T.dark}}>
-        <p style={{fontSize:15,marginBottom:16}}>
-          SeatCraft exists to help teachers turn seating charts into a thoughtful classroom tool, not another weekly chore.
+    <div style={{maxWidth:1180,margin:"0 auto",color:T.dark}}>
+      <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:42,fontWeight:600,marginBottom:44,textAlign:"center",color:T.dark}}>About Us</div>
+      <div style={{lineHeight:1.55,color:T.dark}}>
+        <p style={{fontSize:28,marginBottom:22}}>
+          SeatCraft was created by three students at the American School in Japan.
         </p>
-        <p style={{fontSize:13,color:T.muted,marginBottom:16}}>
-          Our mission is to make classrooms easier to arrange with care: balancing learning needs, social growth, fairness, visibility, and the real constraints of a room. We believe seating should support both academic focus and healthier relationships, especially when students need a little help finding common ground.
+        <p style={{fontSize:28,marginBottom:22}}>
+          The app was created with the goal of making schools less cliquey.
         </p>
-        <p style={{fontSize:13,color:T.muted}}>
-          SeatCraft is built for teacher judgment. The app suggests, organizes, and visualizes, while teachers stay in control as the school year changes and students grow.
+        <p style={{fontSize:28}}>
+          The first version of the app launched on May 17th, and regular updates are made based on teacher feedback.
         </p>
       </div>
     </div>
