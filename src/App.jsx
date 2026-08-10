@@ -4,7 +4,7 @@
 // New in v6:
 //   ✦ Per-desk rotation (slider + keyboard R, grid-snapped to 15°)
 //   ✦ Hexagon border glitch fixed (layered SVG stroke over clipped fill)
-//   ✦ Controls tab — all shortcuts, shapes, tips
+//   ✦ Controls reference removed from main tabs for a cleaner teacher workflow
 //   ✦ Ghost-desk preview when hovering canvas
 //   ✦ Manual student swap in Randomize (click two occupied seats)
 //   ✦ Login input fix (stable component, no per-keystroke remount)
@@ -414,6 +414,29 @@ const DARK = {
 const ThemeCtx = createContext(LIGHT);
 const useT = () => useContext(ThemeCtx);
 
+const hexToRgb = hex => {
+  const h=hex.replace("#","");
+  return {
+    r:parseInt(h.slice(0,2),16),
+    g:parseInt(h.slice(2,4),16),
+    b:parseInt(h.slice(4,6),16),
+  };
+};
+const rgbToHex = ({r,g,b}) =>
+  `#${[r,g,b].map(v=>Math.round(clamp(v,0,255)).toString(16).padStart(2,"0")).join("")}`;
+const mixHex = (a,b,t) => {
+  const ca=hexToRgb(a), cb=hexToRgb(b);
+  return rgbToHex({
+    r:ca.r+(cb.r-ca.r)*t,
+    g:ca.g+(cb.g-ca.g)*t,
+    b:ca.b+(cb.b-ca.b)*t,
+  });
+};
+const withBorderDarkness = (theme, amount=0) => {
+  const t=clamp(Number(amount)||0,0,100)/100;
+  return {...theme,border:mixHex(theme.border,"#111827",t)};
+};
+
 const genderColor = (g,T) => ({M:T.gMale,F:T.gFemale,X:T.gOther}[g]??T.muted);
 const FIXED_GRADE_COLORS = {
   "9":"#DC2626",
@@ -429,6 +452,33 @@ const studentChipBackground = (m,allGrades,T) => {
   if (grade && gender) return `linear-gradient(90deg, ${grade} 0 50%, ${gender} 50% 100%)`;
   return grade ?? gender ?? "transparent";
 };
+function RangeInput({value,onChange,min=0,max=100,step=1,style={},...props}) {
+  const ref=useRef(null);
+  const lo=Number(min), hi=Number(max), st=Number(step);
+  const snapValue=raw=>{
+    const stepped=lo+Math.round((raw-lo)/st)*st;
+    return clamp(Number(stepped.toFixed(5)),lo,hi);
+  };
+  const setFromClientX=clientX=>{
+    const rect=ref.current?.getBoundingClientRect();
+    if(!rect?.width)return;
+    const pct=clamp((clientX-rect.left)/rect.width,0,1);
+    onChange(snapValue(lo+pct*(hi-lo)));
+  };
+  return (
+    <input ref={ref} type="range" min={min} max={max} step={step} value={value}
+      onPointerDown={e=>{
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        setFromClientX(e.clientX);
+      }}
+      onPointerMove={e=>{
+        if(e.buttons===1) setFromClientX(e.clientX);
+      }}
+      onChange={e=>onChange(+e.target.value)}
+      style={{cursor:"pointer",...style}}
+      {...props}/>
+  );
+}
 const svgDataUrl = svg => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 const gridPattern = (T,snap=false) => svgDataUrl(snap
   ? `<svg xmlns="http://www.w3.org/2000/svg" width="${GRID_SZ}" height="${GRID_SZ}" viewBox="0 0 ${GRID_SZ} ${GRID_SZ}"><path d="M .5 0 V ${GRID_SZ} M 0 .5 H ${GRID_SZ}" fill="none" stroke="${T.grid}" stroke-opacity=".35" stroke-width="1"/></svg>`
@@ -475,8 +525,8 @@ const mkStyles = T => `
   .app-shell{display:flex;height:100vh;background:${T.bg};color:${T.dark}}
   .app-sidebar{width:210px;background:${T.sidebar};color:${T.sidebarText};display:flex;flex-direction:column;padding:24px 14px 18px;flex-shrink:0;border-right:1px solid ${T.border}}
   .app-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-  .class-header{padding:22px 28px 0;border-bottom:1px solid ${T.border};flex-shrink:0}
-  .tab-strip{display:flex;gap:2px;overflow-x:auto}
+  .class-header{padding:22px 28px 0;border-bottom:1px solid ${T.border};flex-shrink:0;text-align:center}
+  .tab-strip{display:flex;gap:2px;overflow-x:auto;justify-content:center}
   .class-content{flex:1;overflow:auto;padding:24px 28px;background:${T.bg}}
   .layout-shell{display:grid;grid-template-columns:164px minmax(560px,1fr) 230px;gap:20px;align-items:start}
   .layout-topbar{grid-column:1/-1;background:${T.panel};border:1px solid ${T.border};border-radius:8px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -637,15 +687,17 @@ function LoginField({label,type,value,onChange,onEnter,placeholder}) {
 }
 
 function SeatCraftLogo({size=34,style={}}) {
+  const T=useT();
   const cell=size/4.8;
   const gap=cell*.28;
   const start=(size-(cell*3+gap*2))/2;
   const pos=n=>start+n*(cell+gap);
+  const baseCell=T.isDark ? "#FFFFFF" : "#050505";
   return (
     <svg viewBox={`0 0 ${size} ${size}`} aria-hidden="true" focusable="false"
       style={{width:size,height:size,display:"block",...style}}>
       {[0,1,2].map(r=>[0,1,2].map(c=>{
-        const fill=r===1&&c===1?"#1E9E92":r===0&&c===2?"#1E9E92":"#050505";
+        const fill=r===1&&c===1?"#1E9E92":r===0&&c===2?"#1E9E92":baseCell;
         return <rect key={`${r}-${c}`} x={pos(c)} y={pos(r)} width={cell} height={cell} rx={cell*.22} fill={fill}/>;
       }))}
       <path d={`M ${pos(2)+cell*.62} ${pos(0)-cell*.1} C ${pos(2)+cell*1.15} ${pos(0)+cell*.28}, ${pos(2)+cell*1.1} ${pos(0)+cell*.82}, ${pos(2)+cell*.58} ${pos(0)+cell*1.06}`}
@@ -735,7 +787,6 @@ function LoginPage({onLogin}) {
 // ─── root app ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [dark,setDark]           = useState(false);
-  const T                        = dark ? DARK : LIGHT;
   const [teacher,setTeacher]     = useState(null);
   const [authReady,setAuthReady] = useState(false);
   const [classes,setClasses]     = useState({});
@@ -749,6 +800,8 @@ export default function App() {
   const [updateAvailable,setUpdateAvailable] = useState(false);
   const clsRef = useRef();
   const versionRef = useRef(null);
+  const borderDarkness = active ? classes[active]?.settings?.borderDarkness ?? 0 : 0;
+  const T = withBorderDarkness(dark ? DARK : LIGHT, borderDarkness);
 
   useEffect(()=>{(async()=>{
     try{const s=await safeStorage.get("sc-session");if(s)setTeacher(JSON.parse(s.value));}catch{}
@@ -922,7 +975,7 @@ function EmptyState({onAdd}) {
 // ─── class view ───────────────────────────────────────────────────────────────
 function ClassView({cls,tab,setTab,upd,savedLayouts,setSavedLayouts}) {
   const T=useT();
-  const TABS=["layout","students","randomize","chemistry","settings","controls","about"];
+  const TABS=["layout","students","randomize","chemistry","settings","about"];
   const tabLabel=t=>t==="about"?"About Us":t;
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%",minHeight:0}}>
@@ -945,7 +998,6 @@ function ClassView({cls,tab,setTab,upd,savedLayouts,setSavedLayouts}) {
         {tab==="chemistry" &&<ChemistryTab cls={cls} upd={upd}/>}
         {tab==="randomize" &&<RandomizeTab cls={cls} upd={upd}/>}
         {tab==="settings"  &&<SettingsTab  cls={cls} upd={upd}/>}
-        {tab==="controls"  &&<ControlsTab cls={cls}/>}
         {tab==="about"     &&<AboutTab/>}
       </div>
     </div>
@@ -1421,11 +1473,10 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
                   transition:"opacity .18s ease",userSelect:show?"auto":"none"}}>
                   {/* Rotate */}
                   <span style={{fontSize:11,color:T.muted,flexShrink:0}}>Rotate</span>
-                  <input type="range" min={-180} max={180} step={snapOn?ROT_SNAP:1}
+                  <RangeInput min={-180} max={180} step={snapOn?ROT_SNAP:1}
                     value={commonRot}
-                    onChange={e=>{const t=+e.target.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,rotation:t}:d));}}
-                    onInput={e=>{const t=+e.currentTarget.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,rotation:t}:d));}}
-                    style={{width:130,cursor:"pointer"}}/>
+                    onChange={t=>applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,rotation:t}:d))}
+                    style={{width:130}}/>
                   <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:12,minWidth:36,color:T.dark}}>{commonRot}°</span>
                   <button onClick={()=>rotateSel(90)}
                     style={{background:"none",border:`1px solid ${T.border}`,borderRadius:5,padding:"3px 8px",fontSize:11,color:T.dark}}>+90°</button>
@@ -1437,11 +1488,10 @@ function LayoutTab({cls,upd,savedLayouts={},setSavedLayouts}) {
 
                   {/* Scale / Size */}
                   <span style={{fontSize:11,color:T.muted,flexShrink:0}}>Size</span>
-                  <input type="range" min={0.4} max={2.5} step={0.05}
+                  <RangeInput min={0.4} max={2.5} step={0.05}
                     value={commonScale}
-                    onChange={e=>{const t=+e.target.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:t}:d));}}
-                    onInput={e=>{const t=+e.currentTarget.value;applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:t}:d));}}
-                    style={{width:130,cursor:"pointer"}}/>
+                    onChange={t=>applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:t}:d))}
+                    style={{width:130}}/>
                   <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:12,minWidth:36,color:T.dark}}>×{commonScale.toFixed(1)}</span>
                   <button onClick={()=>applySeats(s=>s.map(d=>selectedRef.current.has(d.id)?{...d,scale:1}:d))}
                     style={{background:"none",border:`1px solid ${T.border}`,borderRadius:5,padding:"3px 8px",fontSize:11,color:T.dark}}>↺</button>
@@ -1711,7 +1761,7 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
         borderRadius:"50%",background:T.accent,color:"#fff",zIndex:6,pointerEvents:"none",
         display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,
         boxShadow:"0 2px 8px rgba(0,0,0,.2)"}}>🔒</div>}
-      {gc && <div style={{position:"absolute",top:4,right:4,width:7,height:7,
+      {showStudentColors && gc && <div style={{position:"absolute",top:4,right:4,width:7,height:7,
         borderRadius:"50%",background:gc,zIndex:3,pointerEvents:"none"}}/>}
     </>
   );
@@ -1903,11 +1953,11 @@ function StudentsTab({cls,upd}) {
       </p>
       <div className="students-shell">
         <div className="student-editor">
-          <div style={{fontSize:9,letterSpacing:2,marginBottom:6,color:T.muted}}>STUDENT NAMES</div>
+          <div style={{fontSize:9,letterSpacing:2,marginBottom:6,color:T.muted,fontWeight:700}}>STUDENT NAMES</div>
           <textarea value={raw} onChange={e=>setRaw(e.target.value)}
             placeholder={"Alice Johnson\nBob Smith\nCarla Davis\n..."}
             style={{width:"100%",height:220,border:`1px solid ${T.border}`,borderRadius:8,padding:14,
-              fontSize:13,fontFamily:"'Liberation Mono', 'Courier New', monospace",background:T.panel,resize:"vertical",
+              fontSize:16,fontFamily:"'Liberation Mono', 'Courier New', monospace",background:T.panel,resize:"vertical",
               outline:"none",lineHeight:1.9,color:T.dark}}/>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:10,gap:8}}>
             <span style={{fontSize:12,color:T.muted}}>{cnt} student{cnt!==1?"s":""}</span>
@@ -1925,13 +1975,13 @@ function StudentsTab({cls,upd}) {
         </div>
         {cls.students.length>0&&(
           <div className="student-meta-panel">
-            <div style={{fontSize:9,letterSpacing:2,marginBottom:6,color:T.muted}}>GENDER, GRADE, FOCUS & SUPPORT</div>
+            <div style={{fontSize:9,letterSpacing:2,marginBottom:6,color:T.muted,fontWeight:700}}>GENDER, GRADE, FOCUS & SUPPORT</div>
             <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:280,overflowY:"auto"}}>
               {cls.students.map(name=>{
                 const m=meta[name]??{};
                 return (
                   <div key={name} style={{display:"flex",alignItems:"center",gap:8,background:T.panel,border:`1px solid ${T.border}`,borderRadius:7,padding:"6px 10px",flexWrap:"wrap"}}>
-                    <span style={{fontSize:12,flex:"1 1 120px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:T.dark}}>{name}</span>
+                    <span style={{fontSize:15,flex:"1 1 120px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:T.dark}}>{name}</span>
                     <div style={{display:"flex",gap:2}}>
                       {[["M","M"],["F","F"],["X","X"],["","—"]].map(([val,lbl])=>(
                         <button key={val} onClick={()=>setM(name,"gender",val)}
@@ -1968,7 +2018,7 @@ function StudentsTab({cls,upd}) {
         )}
         {cls.students.length>0&&(
           <div className="student-roster-panel" style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:10,padding:16}}>
-            <div style={{fontSize:9,letterSpacing:2,marginBottom:10,color:T.muted}}>SAVED ({cls.students.length})</div>
+            <div style={{fontSize:9,letterSpacing:2,marginBottom:10,color:T.muted,fontWeight:700}}>SAVED ({cls.students.length})</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6,maxHeight:390,overflowY:"auto"}}>
             {cls.students.map(s=>{const m=cls.studentMeta?.[s]??{};const gc=m.gender?genderColor(m.gender,T):null;
               return (
@@ -2068,9 +2118,8 @@ function ChemistryTab({cls,upd}) {
                   <span>Chemistry</span>
                   <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",color:col,fontWeight:700}}>{v}</span>
                 </div>
-                <input type="range" min={0} max={100} step={5} value={v}
-                  onChange={e=>setChem(directA,directB,+e.target.value)}
-                  onInput={e=>setChem(directA,directB,+e.currentTarget.value)}
+                <RangeInput min={0} max={100} step={5} value={v}
+                  onChange={next=>setChem(directA,directB,next)}
                   style={{width:"100%",accentColor:col}}/>
               </>
             );
@@ -2172,9 +2221,8 @@ function ChemistryTab({cls,upd}) {
                     <span style={{fontSize:10,color:T.muted}}>Chemistry</span>
                     <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:13,color:col,fontWeight:700}}>{v}</span>
                   </div>
-                  <input type="range" min={0} max={100} step={5} value={v}
-                    onChange={e=>setChem(editing.a,editing.b,+e.target.value)}
-                    onInput={e=>setChem(editing.a,editing.b,+e.currentTarget.value)}
+                  <RangeInput min={0} max={100} step={5} value={v}
+                    onChange={next=>setChem(editing.a,editing.b,next)}
                     style={{width:"100%",accentColor:col}}/>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:T.muted,marginTop:2}}>
                     <span style={{color:"#E53E3E"}}>0</span>
@@ -2237,7 +2285,7 @@ function ChemistryTab({cls,upd}) {
   );
 }
 
-function PresenterView({cls,layout,result,studentMeta,allGrades,locked,showStudentColors,onClose}) {
+function PresenterView({cls,layout,result,studentMeta,allGrades,locked,showStudentColors,setShowStudentColors,onClose}) {
   const T=useT();
   const [size,setSize]=useState(()=>({w:window.innerWidth,h:window.innerHeight}));
   useEffect(()=>{
@@ -2261,11 +2309,18 @@ function PresenterView({cls,layout,result,studentMeta,allGrades,locked,showStude
             {layout.name} seating chart
           </div>
         </div>
-        <button onClick={onClose}
-          style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 16px",
-            color:T.dark,fontSize:13,boxShadow:"0 2px 10px rgba(0,0,0,.12)"}}>
-          Exit Presenter
-        </button>
+        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",justifyContent:"flex-end"}}>
+          <label style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontSize:12,color:T.dark,userSelect:"none",
+            background:T.panel,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 14px",boxShadow:"0 2px 10px rgba(0,0,0,.12)"}}>
+            <input type="checkbox" checked={showStudentColors} onChange={e=>setShowStudentColors(e.target.checked)}/>
+            Present with colors
+          </label>
+          <button onClick={onClose}
+            style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 16px",
+              color:T.dark,fontSize:13,boxShadow:"0 2px 10px rgba(0,0,0,.12)"}}>
+            Exit Presenter
+          </button>
+        </div>
       </div>
 
       <div style={{width:CW*scale,height:CH*scale,position:"relative",flexShrink:0}}>
@@ -2429,7 +2484,8 @@ function RandomizeTab({cls,upd}) {
     <div>
       {presenting&&layout&&result&&(
         <PresenterView cls={cls} layout={layout} result={result} studentMeta={studentMeta}
-          allGrades={allGrades} locked={validLocked} showStudentColors={presentColors} onClose={closePresenter}/>
+          allGrades={allGrades} locked={validLocked} showStudentColors={presentColors}
+          setShowStudentColors={setPresentColors} onClose={closePresenter}/>
       )}
       <div style={{display:"flex",gap:18,alignItems:"flex-end",marginBottom:12,flexWrap:"wrap"}}>
         <div>
@@ -2444,10 +2500,6 @@ function RandomizeTab({cls,upd}) {
           <div style={{fontSize:9,letterSpacing:2,marginBottom:7,color:T.muted}}>PROXIMITY · {radius}px</div>
           <div style={{fontSize:11,color:T.muted}}>Capacity {totalCapacity} seat{totalCapacity!==1?"s":""} · adjust in Layout</div>
         </div>
-        <label style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontSize:12,color:T.dark,userSelect:"none",background:T.panel,border:`1px solid ${T.border}`,borderRadius:7,padding:"9px 12px"}}>
-          <input type="checkbox" checked={presentColors} onChange={e=>setPresentColors(e.target.checked)}/>
-          Present with colors
-        </label>
       </div>
 
       <div style={{fontSize:12,color:T.dark,marginBottom:12,background:T.panel,borderRadius:7,
@@ -2630,11 +2682,10 @@ function SettingsSlider({value, onChange, min, max, step}) {
     // preventing the settings rows from wiggling as values change.
     <div style={{display:"flex",alignItems:"center",gap:10,width:240}}>
       <div style={{flex:1}}>
-        <input type="range" min={min} max={max} step={step}
+        <RangeInput min={min} max={max} step={step}
           value={local}
-          onChange={e=>{const v=+e.target.value; setLocal(v); onChange(v);}}
-          onInput={e=>{const v=+e.currentTarget.value; setLocal(v); onChange(v);}}
-          style={{width:"100%",cursor:"pointer"}}/>
+          onChange={v=>{setLocal(v); onChange(v);}}
+          style={{width:"100%"}}/>
         {showTicks&&(
           <div style={{display:"flex",justifyContent:"space-between",marginTop:-3}}>
             {Array.from({length:tickCount},(_,i)=>min+i*step).map(tick=>(
@@ -2647,27 +2698,6 @@ function SettingsSlider({value, onChange, min, max, step}) {
       </div>
       <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:12,minWidth:32,
         textAlign:"right",color:T.dark}}>{local}</span>
-    </div>
-  );
-}
-
-function NeighborRadiusVisual({radius}) {
-  const T=useT();
-  return (
-    <div style={{width:220,background:T.panel,border:`1px solid ${T.border}`,borderRadius:8,padding:"12px 14px"}}>
-      <div style={{position:"relative",height:64,borderBottom:`1px solid ${T.border}`}}>
-        {[40,120,200,300].map(px=>(
-          <div key={px} style={{position:"absolute",left:`${((px-40)/(300-40))*100}%`,bottom:0,transform:"translateX(-50%)",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-            <div style={{height:px===radius?48:28,width:1,background:px===radius?T.accent:T.border}}/>
-            <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:9,color:px===radius?T.accent:T.muted}}>{px}</span>
-          </div>
-        ))}
-        <div style={{position:"absolute",left:0,right:0,top:18,height:1,background:T.border}}/>
-        <div style={{position:"absolute",left:0,top:18,width:`${((radius-40)/(300-40))*100}%`,height:1,background:T.accent}}/>
-      </div>
-      <div style={{fontSize:11,color:T.muted,lineHeight:1.5,marginTop:9}}>
-        The highlighted line shows the current neighbor distance in screen pixels.
-      </div>
     </div>
   );
 }
@@ -2696,16 +2726,17 @@ function SettingsTab({cls,upd}) {
   );
   // Note: Slider deliberately uses the module-level SettingsSlider component —
   // do NOT inline it here; see comment above SettingsSlider for why.
-  const Slider=({f,min,max,step})=>(
-    <SettingsSlider value={s[f]??Math.round((min+max)/2)} onChange={v=>set(f,v)} min={min} max={max} step={step}/>
+  const Slider=({f,min,max,step,defaultValue=Math.round((min+max)/2)})=>(
+    <SettingsSlider value={s[f]??defaultValue} onChange={v=>set(f,v)} min={min} max={max} step={step}/>
   );//s
-  const Sec=({t})=><div style={{fontSize:10,letterSpacing:2,color:T.muted,marginTop:24,marginBottom:2}}>{t}</div>;
+  const Sec=({t})=><div style={{fontSize:10,letterSpacing:2,color:T.muted,marginTop:24,marginBottom:2,fontWeight:700}}>{t}</div>;
   const activeRules=[
     ["Neighbor radius",`${radius}px`],
     ["Even groups",s.evenGroups?"On":"Off"],
     ["Gender separation",s.separateGenders?`On · ${clamp(s.genderWeight??5,0,10)}`:"Off"],
     ["Grade mixing",s.mixGrades?`On · ${clamp(s.gradeWeight??5,0,10)}`:"Off"],
     ["Focus Level",s.mixMentalCapacity?`${s.mentalMixMode==="homogeneous"?"Homogeneous":"Heterogeneous"} · ${s.mentalCapacityWeight??50}`:"Off"],
+    ["Border darkness",`${s.borderDarkness??0}`],
   ];
   return (//s
     <div className="settings-shell">
@@ -2714,10 +2745,7 @@ function SettingsTab({cls,upd}) {
         <p style={{color:T.muted,fontSize:13,marginBottom:24,lineHeight:1.6}}>Higher weights enforce constraints more strongly relative to chemistry scores.</p>
         <Sec t="PROXIMITY"/>
         <Row label="Neighbor radius" desc={`Desks within this range are "neighbors" for scoring. Currently ${s.proximityRadius??120}px.`}>
-          <div style={{display:"flex",gap:14,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}}>
-            <Slider f="proximityRadius" min={40} max={300} step={10}/>
-            <NeighborRadiusVisual radius={radius}/>
-          </div>
+          <Slider f="proximityRadius" min={40} max={300} step={10}/>
         </Row>
         <Row label="Make groups even" desc="Balances occupied neighbor groups, where a group is desks inside the neighbor radius plus their connected mutuals.">
           <Toggle f="evenGroups" label="Balance neighbor groups"/>
@@ -2748,6 +2776,10 @@ function SettingsTab({cls,upd}) {
             <Slider f="mentalCapacityWeight" min={0} max={150} step={5}/>
           </Row>
         </>}
+        <Sec t="DISPLAY"/>
+        <Row label="Border darkness" desc="Controls the border strength on panels, boxes, rows, and classroom controls.">
+          <Slider f="borderDarkness" min={0} max={100} step={5} defaultValue={0}/>
+        </Row>
       </div>
       <div className="insight-panel">
         <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:12}}>CURRENT RULES</div>
@@ -2767,162 +2799,19 @@ function SettingsTab({cls,upd}) {
   );
 }
 
-// ─── controls tab ─────────────────────────────────────────────────────────────
-function ControlsTab({cls}) {
-  const T=useT();
-  const s=cls?.settings??{};
-  const Sec=({title,children})=>(
-    <div style={{marginBottom:32}}>
-      <div style={{fontSize:10,letterSpacing:2,color:T.muted,marginBottom:14}}>{title}</div>
-      {children}
-    </div>
-  );
-  const KRow=({keys,desc})=>(
-    <div className="krow" style={{display:"flex",alignItems:"center",gap:16,padding:"9px 0",borderBottom:`1px solid ${T.border}`}}>
-      <div style={{display:"flex",gap:4,minWidth:180,flexWrap:"wrap"}}>
-        {keys.map((k,i)=>(
-          <kbd key={i} style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:5,
-            padding:"3px 8px",fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:11,color:T.dark,
-            boxShadow:"0 1px 2px rgba(0,0,0,.1)",whiteSpace:"nowrap"}}>{k}</kbd>
-        ))}
-      </div>
-      <span style={{fontSize:13,color:T.dark}}>{desc}</span>
-    </div>
-  );
-  const VRow=({label,value,desc})=>(
-    <div style={{display:"grid",gridTemplateColumns:"minmax(140px,180px) minmax(70px,90px) 1fr",
-      gap:12,alignItems:"start",padding:"10px 0",borderBottom:`1px solid ${T.border}`}}>
-      <span style={{fontSize:13,color:T.dark,fontWeight:500}}>{label}</span>
-      <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",fontSize:12,color:T.accent,fontWeight:700}}>{value}</span>
-      <span style={{fontSize:12,color:T.muted,lineHeight:1.55}}>{desc}</span>
-    </div>
-  );
-
-  return (
-    <div style={{width:"100%"}}>
-      <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:22,marginBottom:6,color:T.dark}}>Controls Reference</div>
-      <p style={{color:T.muted,fontSize:13,marginBottom:28,lineHeight:1.6}}>Keyboard shortcuts, interaction patterns, and randomizer value meanings in one place.</p>
-
-      <div className="controls-grid">
-        <Sec title="RANDOMIZER VALUES">
-          <VRow label="Neighbor radius" value={`${s.proximityRadius??120}px`}
-            desc="Two desks within this screen-pixel distance count as neighbors. Bigger values make more nearby pairs affect the score."/>
-          <VRow label="Chemistry score" value="0-100"
-            desc="New pairs start at 50. Lower scores are prioritized as neighbors so students with strained chemistry can build better relationships."/>
-          <VRow label="Gender separation" value={s.separateGenders?`On · ${clamp(s.genderWeight??5,0,10)}`:"Off"}
-            desc="When on, same-gender neighbor pairs receive an extra penalty using the M/F/X values from Students."/>
-          <VRow label="Gender weight" value={`${clamp(s.genderWeight??5,0,10)}`}
-            desc="Strength of that same-gender penalty from 0 to 10, with one-step markers in Settings."/>
-          <VRow label="Grade mixing" value={s.mixGrades?`On · ${clamp(s.gradeWeight??5,0,10)}`:"Off"}
-            desc="When on, same-grade neighbor pairs receive an extra penalty so the optimizer spreads grade levels apart."/>
-          <VRow label="Grade weight" value={`${clamp(s.gradeWeight??5,0,10)}`}
-            desc="Strength of the same-grade penalty from 0 to 10, with one-step markers in Settings."/>
-          <VRow label="Focus level mixing" value={s.mixMentalCapacity?`${s.mentalMixMode==="homogeneous"?"Same":"Different"} · ${s.mentalCapacityWeight??50}`:"Off"}
-            desc="Uses the 1-5 focus level from Students. Homogeneous keeps similar focus levels nearby; heterogeneous spreads similar focus levels apart."/>
-          <VRow label="Table capacity" value="Layout +/-"
-            desc="The plus and minus controls on each desk set how many students fit there. Open capacity can receive moved students in Randomize."/>
-        </Sec>
-
-        <Sec title="PLACING DESKS">
-          <KRow keys={["Click canvas"]} desc="Place a new desk at that position"/>
-          <KRow keys={["Drag desk"]} desc="Reposition the desk"/>
-          <KRow keys={["+ / − on desk"]} desc="Increase or decrease how many students can sit at that table"/>
-          <KRow keys={["Right-click desk"]} desc="Context menu: delete, copy, duplicate"/>
-          <KRow keys={["Click canvas (Formation dropdown)"]} desc="Insert a preset group of desks centered on canvas"/>
-          <KRow keys={["Shape picker (toolbar)"]} desc="Select desk shape before clicking to place"/>
-        </Sec>
-
-        <Sec title="SELECTION">
-          <KRow keys={["Click desk"]} desc="Select desk (deselects others)"/>
-          <KRow keys={["Shift + Click"]} desc="Add/remove desk from selection"/>
-          <KRow keys={["Drag empty canvas"]} desc="Lasso-select all desks in rectangle"/>
-          <KRow keys={["Ctrl+A"]} desc="Select all desks"/>
-          <KRow keys={["Escape"]} desc="Deselect all"/>
-        </Sec>
-
-        <Sec title="EDITING">
-          <KRow keys={["Ctrl+Z"]} desc="Undo"/>
-          <KRow keys={["Ctrl+Y","Ctrl+Shift+Z"]} desc="Redo"/>
-          <KRow keys={["Delete","Backspace"]} desc="Delete selected desks"/>
-          <KRow keys={["Ctrl+C"]} desc="Copy selected desks"/>
-          <KRow keys={["Ctrl+V"]} desc="Paste copied desks (offset from original)"/>
-          <KRow keys={["Ctrl+D"]} desc="Duplicate selected desks"/>
-          <KRow keys={["↑ ↓ ← →"]} desc="Nudge selected desks by 1px"/>
-          <KRow keys={["Shift + Arrows"]} desc="Nudge by 10px"/>
-          <KRow keys={["R"]} desc="Rotate selected desks +15°"/>
-          <KRow keys={["Shift+R"]} desc="Rotate selected desks −15°"/>
-          <KRow keys={["Rotation slider"]} desc="Fine-tune rotation (appears in toolbar when desks are selected)"/>
-        </Sec>
-
-        <Sec title="ROOM SHAPE">
-          <KRow keys={["Room preset buttons"]} desc="Apply a preset polygon (Rectangle, L, T, Hexagon, Octagon)"/>
-          <KRow keys={["Edit vertices"]} desc="Enter vertex-drag mode to reshape the room freely"/>
-          <KRow keys={["Drag handle"]} desc="Move a polygon vertex (snaps to grid if Snap is on)"/>
-          <KRow keys={["+ Point / − Point"]} desc="Add or remove a vertex from the polygon"/>
-        </Sec>
-
-        <Sec title="RANDOMIZE (Randomize tab)">
-          <KRow keys={["Randomize"]} desc="Run SA optimizer to assign all students to seats"/>
-          <KRow keys={["Present"]} desc="Open a fullscreen seating chart for screen sharing or classroom display"/>
-          <KRow keys={["Lock chips","Desk lock"]} desc="Keep selected students in their current seats on the next randomize"/>
-          <KRow keys={["Click two names"]} desc="After randomizing, swap two individual students"/>
-          <KRow keys={["Name, then open seat"]} desc="Move the selected student into an empty desk or table spot"/>
-          <KRow keys={["Clear"]} desc="Clear the randomized result and start over"/>
-        </Sec>
-
-        <Sec title="SNAP TO GRID">
-          <p style={{fontSize:13,color:T.dark,lineHeight:1.7,padding:"9px 0",borderBottom:`1px solid ${T.border}`}}>
-            Toggle "Snap {GRID_SZ}px" in the toolbar. When on: desk placement snaps to the {GRID_SZ}px dot-grid,
-            rotation snaps to {ROT_SNAP}° increments, and room polygon vertices snap to the same grid.
-          </p>
-        </Sec>
-
-        {/* Shape gallery */}
-        <Sec title="DESK SHAPES">
-          <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-            {DESK_SHAPES.map(sh=>(
-              <div key={sh.id} style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:10,
-                padding:"14px 20px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,minWidth:90}}>
-                <span style={{fontSize:26}}>{sh.icon}</span>
-                <span style={{fontSize:11,fontWeight:500,color:T.dark}}>{sh.label}</span>
-                <span style={{fontSize:9,color:T.muted}}>{sh.isHex?"SVG hex":sh.baseRot?`base ${sh.baseRot}°`:`${sh.bRadius} radius`}</span>
-              </div>
-            ))}
-          </div>
-        </Sec>
-
-        {/* Formation gallery */}
-        <Sec title="FORMATION PRESETS">
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8}}>
-            {["Pods","Rows","U-Tables","Rings","Grids"].map(cat=>(
-              <div key={cat}>
-                <div style={{fontSize:9,letterSpacing:1,color:T.muted,marginBottom:5}}>{cat.toUpperCase()}</div>
-                {TABLE_PRESETS.filter(p=>p.cat===cat).map(p=>(
-                  <div key={p.id} style={{background:T.panel,border:`1px solid ${T.border}`,
-                    borderRadius:6,padding:"5px 10px",fontSize:11,marginBottom:4,color:T.dark}}>{p.label}</div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </Sec>
-      </div>
-    </div>
-  );
-}
-
 function AboutTab() {
   const T=useT();
   return (
     <div style={{maxWidth:1180,margin:"0 auto",color:T.dark}}>
-      <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:42,fontWeight:600,marginBottom:44,textAlign:"center",color:T.dark}}>About Us</div>
+      <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:24,fontWeight:600,marginBottom:28,textAlign:"center",color:T.dark}}>About Us</div>
       <div style={{lineHeight:1.55,color:T.dark}}>
-        <p style={{fontSize:28,marginBottom:22}}>
+        <p style={{fontSize:24,marginBottom:18}}>
           SeatCraft was created by three students at the American School in Japan.
         </p>
-        <p style={{fontSize:28,marginBottom:22}}>
+        <p style={{fontSize:24,marginBottom:18}}>
           The app was created with the goal of making schools less cliquey.
         </p>
-        <p style={{fontSize:28}}>
+        <p style={{fontSize:24}}>
           The first version of the app launched on May 17th, and regular updates are made based on teacher feedback.
         </p>
       </div>
