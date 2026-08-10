@@ -539,7 +539,7 @@ const mkStyles = T => `
   .canvas-stage{position:relative;width:${CW}px;height:${CH}px}
   .students-shell{display:grid;grid-template-columns:minmax(280px,330px) minmax(320px,1fr) minmax(260px,.8fr);gap:24px;align-items:flex-start}
   .student-editor,.student-meta-panel,.student-roster-panel{min-width:0}
-  .chemistry-shell{display:grid;grid-template-columns:220px minmax(540px,720px) minmax(260px,1fr);gap:20px;align-items:flex-start;width:100%}
+  .chemistry-shell{display:grid;grid-template-columns:220px minmax(680px,860px) minmax(260px,1fr);gap:20px;align-items:flex-start;width:100%}
   .chemistry-list{width:220px}
   .chemistry-graph-panel{min-width:0;position:relative}
   .insight-panel{background:${T.panel};border:1px solid ${T.border};border-radius:10px;padding:16px;min-width:0;color:${T.dark}}
@@ -548,7 +548,7 @@ const mkStyles = T => `
   @media (max-width:1180px){
     .students-shell{grid-template-columns:minmax(280px,330px) minmax(320px,1fr)}
     .student-roster-panel{grid-column:1/-1}
-    .chemistry-shell{grid-template-columns:220px minmax(540px,1fr)}
+    .chemistry-shell{grid-template-columns:220px minmax(640px,1fr)}
     .chemistry-shell .insight-panel{grid-column:1/-1}
     .settings-shell{grid-template-columns:minmax(480px,1fr)}
   }
@@ -711,7 +711,7 @@ function SeatCraftLogo({size=34,style={}}) {
 function SeatCraftWordmark({compact=false}) {
   const T=useT();
   return (
-    <div style={{display:"flex",alignItems:"center",justifyContent:compact?"center":"flex-start",gap:10,minWidth:0}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,minWidth:0}}>
       <SeatCraftLogo size={compact?30:38}/>
       <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontWeight:700,fontSize:compact?21:30,lineHeight:1,whiteSpace:"nowrap"}}>
         <span style={{color:T.dark}}>Seat</span><span style={{color:T.accent}}>Craft</span>
@@ -902,7 +902,7 @@ export default function App() {
           <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:9,letterSpacing:2,color:T.sidebarMuted,marginBottom:8,textAlign:"center"}}>CLASSROOM SEATING</div>
           <div style={{fontSize:10,color:T.sidebarMuted,marginBottom:18,overflow:"hidden",
             textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={teacher}>{teacher}</div>
-          <div style={{fontSize:9,letterSpacing:2,opacity:.3,marginBottom:10}}>CLASSES</div>
+          <div style={{fontSize:9,letterSpacing:2,color:T.sidebarMuted,fontWeight:700,marginBottom:10}}>CLASSES</div>
           <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
             {Object.values(classes).map(c=>(
               <div key={c.id} className="ci" onClick={()=>{setActive(c.id);setTab("layout");}}
@@ -975,8 +975,8 @@ function EmptyState({onAdd}) {
 // ─── class view ───────────────────────────────────────────────────────────────
 function ClassView({cls,tab,setTab,upd,savedLayouts,setSavedLayouts}) {
   const T=useT();
-  const TABS=["layout","students","randomize","chemistry","settings","about"];
-  const tabLabel=t=>t==="about"?"About Us":t;
+  const TABS=["layout","students","randomize","chemistry","settings"];
+  const tabLabel=t=>t;
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%",minHeight:0}}>
       <div className="class-header">
@@ -998,7 +998,6 @@ function ClassView({cls,tab,setTab,upd,savedLayouts,setSavedLayouts}) {
         {tab==="chemistry" &&<ChemistryTab cls={cls} upd={upd}/>}
         {tab==="randomize" &&<RandomizeTab cls={cls} upd={upd}/>}
         {tab==="settings"  &&<SettingsTab  cls={cls} upd={upd}/>}
-        {tab==="about"     &&<AboutTab/>}
       </div>
     </div>
   );
@@ -1716,7 +1715,7 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
         <span style={{fontFamily:"'Arial', 'Helvetica Neue', sans-serif",display:"flex",flexDirection:"column",
           alignItems:"center",justifyContent:"center",gap:2,
           fontSize: Math.max(5, (assignedStudents.length>1?6.8:8.5) * Math.min(sc, 1.8)),
-          fontWeight:500, color:"#fff", textAlign:"center",
+          fontWeight:700, color:"#fff", textAlign:"center",
           padding:"0 3px", lineHeight:1.2, maxHeight:"100%", overflow:"hidden"}}>
           {assignedStudents.map((name,i) => {
             const m = Array.isArray(meta) ? (meta[i] ?? {}) : primaryMeta;
@@ -1725,7 +1724,7 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
             const active=activeStudentKey===`${seat.id}::${i}`;
             const chipStyle={display:"block",whiteSpace:"normal",overflow:"visible",
               overflowWrap:"anywhere",maxWidth:W-8,borderRadius:999,padding:hasChipColor?"2px 6px":"1px 4px",
-              background:active?T.sel:bg,color:active?"#fff":(hasChipColor?gradeTextColor(m.grade):"#fff"),
+              background:active?T.sel:(hasChipColor?bg:"transparent"),color:active?"#fff":(hasChipColor?gradeTextColor(m.grade):"#fff"),
               boxShadow:active?`0 0 0 2px #fff, 0 0 0 4px ${T.sel}`:(hasChipColor?"0 1px 3px rgba(0,0,0,.18)":"none"),
               border:"none",font:"inherit",lineHeight:1.2};
             return onStudentClick ? (
@@ -1744,9 +1743,9 @@ function DeskBody({seat,theme:T,isSelected,isHovered,isLocked=false,student,stud
       ) : (
         <span style={{fontFamily:"'Liberation Mono', 'Courier New', monospace",
           fontSize: Math.max(5, 8 * Math.min(sc, 1.8)),
-          color: isSelected ? T.sel : T.muted, textAlign:"center", lineHeight:1.25}}>
+          color: isSelected ? T.sel : T.dark, textAlign:"center", lineHeight:1.25,fontWeight:700}}>
           <span style={{display:"block"}}>desk</span>
-          <span style={{display:"block",fontSize:Math.max(5,6*Math.min(sc,1.8))}}>
+          <span style={{display:"block",fontSize:Math.max(5,6*Math.min(sc,1.8)),fontWeight:700}}>
             {capacity} seat{capacity!==1?"s":""}
           </span>
         </span>
@@ -1976,7 +1975,7 @@ function StudentsTab({cls,upd}) {
         {cls.students.length>0&&(
           <div className="student-meta-panel">
             <div style={{fontSize:9,letterSpacing:2,marginBottom:6,color:T.muted,fontWeight:700}}>GENDER, GRADE, FOCUS & SUPPORT</div>
-            <div style={{display:"flex",flexDirection:"column",gap:5,maxHeight:280,overflowY:"auto"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
               {cls.students.map(name=>{
                 const m=meta[name]??{};
                 return (
@@ -2019,7 +2018,7 @@ function StudentsTab({cls,upd}) {
         {cls.students.length>0&&(
           <div className="student-roster-panel" style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:10,padding:16}}>
             <div style={{fontSize:9,letterSpacing:2,marginBottom:10,color:T.muted,fontWeight:700}}>SAVED ({cls.students.length})</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,maxHeight:390,overflowY:"auto"}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
             {cls.students.map(s=>{const m=cls.studentMeta?.[s]??{};const gc=m.gender?genderColor(m.gender,T):null;
               return (
                 <span key={s} style={{background:T.chip,padding:"3px 10px",borderRadius:20,fontSize:12,display:"flex",alignItems:"center",gap:5,color:T.dark}}>
@@ -2078,7 +2077,7 @@ function ChemistryTab({cls,upd}) {
   const setChem=(a,b,v)=>upd(c=>({...c,chemistry:{...c.chemistry,[pairKey(a,b)]:v}}));
   const getV=(a,b)=>chemistry[pairKey(a,b)]??50;
 
-  const W=520,H=420,cx=W/2,cy=H/2;
+  const W=660,H=540,cx=W/2,cy=H/2;
   const others=sel?students.filter(s=>s!==sel):[];
   const n=others.length;
   const R=Math.min(cx,cy)-55;
@@ -2474,6 +2473,7 @@ function RandomizeTab({cls,upd}) {
   };
 
   const canRun=layout&&students.length>0&&seatSlots.length>0&&!running;
+  const chartScale=1.18;
   const active=[
     settings.separateGenders&&`Gender (w=${clamp(settings.genderWeight??5,0,10)})`,
     settings.mixGrades&&`Grade mix (w=${clamp(settings.gradeWeight??5,0,10)})`,
@@ -2566,10 +2566,12 @@ function RandomizeTab({cls,upd}) {
             </label>
           </div>
           {/* Canvas */}
-          <div style={{display:"grid",gridTemplateColumns:"minmax(0, max-content) minmax(240px,320px)",gap:16,alignItems:"start"}}>
+          <div style={{display:"grid",gridTemplateColumns:"minmax(0, max-content) minmax(260px,320px)",gap:28,alignItems:"start"}}>
           <div className="canvas-scroll">
+          <div style={{position:"relative",width:CW*chartScale,height:CH*chartScale}}>
           <div className="canvas-stage" style={{border:`1px solid ${T.border}`,borderRadius:10,
-            boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
+            boxShadow:"0 2px 8px rgba(0,0,0,.08)",position:"absolute",left:0,top:0,
+            transform:`scale(${chartScale})`,transformOrigin:"top left"}}>
             {/* Bg */}
             <div style={{position:"absolute",inset:0,background:T.canvas,borderRadius:10,
               backgroundImage:gridPattern(T,false),
@@ -2607,6 +2609,7 @@ function RandomizeTab({cls,upd}) {
               <polygon points={(layout.roomPoly??DEFAULT_ROOM()).map(p=>`${p.x},${p.y}`).join(" ")}
                 fill="none" stroke="rgba(128,128,128,.2)" strokeWidth={1} strokeDasharray="5 4"/>
             </svg>
+          </div>
           </div>
           </div>
           <div style={{fontSize:12,color:T.dark,background:T.panel,borderRadius:7,
@@ -2794,26 +2797,6 @@ function SettingsTab({cls,upd}) {
         <div style={{background:T.tipBg,border:`1px solid ${T.tipBorder}`,borderRadius:8,padding:"14px 16px",fontSize:12,color:T.tipText,lineHeight:1.8}}>
           <strong>Tip:</strong> Chemistry now starts at 50, and lower-scored pairs are preferred as neighbors for relationship-building. Run Randomize several times — SA is stochastic.
         </div>
-      </div>
-    </div>
-  );
-}
-
-function AboutTab() {
-  const T=useT();
-  return (
-    <div style={{maxWidth:1180,margin:"0 auto",color:T.dark}}>
-      <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:24,fontWeight:600,marginBottom:28,textAlign:"center",color:T.dark}}>About Us</div>
-      <div style={{lineHeight:1.55,color:T.dark}}>
-        <p style={{fontSize:24,marginBottom:18}}>
-          SeatCraft was created by three students at the American School in Japan.
-        </p>
-        <p style={{fontSize:24,marginBottom:18}}>
-          The app was created with the goal of making schools less cliquey.
-        </p>
-        <p style={{fontSize:24}}>
-          The first version of the app launched on May 17th, and regular updates are made based on teacher feedback.
-        </p>
       </div>
     </div>
   );
