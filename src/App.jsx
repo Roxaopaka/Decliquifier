@@ -52,6 +52,14 @@ const repairMojibake = value => {
   }
 };
 const cleanStudentName = value => repairMojibake(value).trim();
+const shuffle = values => {
+  const next = [...values];
+  for (let i = next.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
+};
 const safeStorage = {
   async get(key) {
     if (window.storage?.get) return window.storage.get(key);
@@ -240,6 +248,20 @@ const ROOM_PRESETS = [
   {id:"oct", label:"Octagon",  fn:()=>{const cx=CW/2,cy=CH/2,rx=CW/2-30,ry=CH/2-20;return Array.from({length:8},(_,i)=>{const a=(Math.PI/4)*i-Math.PI/8;return{x:cx+Math.cos(a)*rx,y:cy+Math.sin(a)*ry};});}},
 ];
 const polyToClip = poly=>`polygon(${poly.map(p=>`${p.x}px ${p.y}px`).join(", ")})`;
+const pointInPoly = (x,y,poly=DEFAULT_ROOM()) => {
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const pi=poly[i],pj=poly[j];
+    const crosses=((pi.y>y)!==(pj.y>y))&&
+      (x < ((pj.x-pi.x)*(y-pi.y))/(pj.y-pi.y||Number.EPSILON)+pi.x);
+    if(crosses) inside=!inside;
+  }
+  return inside;
+};
+const seatsInsideRoom = layout => {
+  const poly=layout?.roomPoly??DEFAULT_ROOM();
+  return (layout?.seats??[]).filter(seat=>pointInPoly(seat.x,seat.y,poly));
+};
 
 // ─── data factories ───────────────────────────────────────────────────────────
 const mkClass = name=>({
@@ -276,6 +298,19 @@ const layoutFromSaved = saved=>({
   name:saved?.name||"Saved layout",
   seats:cloneSeatsForLayout(saved?.seats),
   roomPoly:cloneRoomPoly(saved?.roomPoly),
+});
+const cloneResult = result => Object.fromEntries(Object.entries(result??{}).map(([seatId,students])=>[
+  seatId,
+  Array.isArray(students) ? [...students] : students ? [students] : [],
+]));
+const mkSavedRandomization = ({name,layout,result,locked})=>({
+  id:uid(),
+  name,
+  layoutId:layout.id,
+  layoutName:layout.name,
+  result:cloneResult(result),
+  locked:[...(locked??new Set())],
+  savedAt:Date.now(),
 });
 
 // ─── SA optimizer ─────────────────────────────────────────────────────────────
@@ -316,10 +351,11 @@ function scoreFn(asgn,seats,chem,r,studentMeta={},settings={}) {
 }
 function runSA(students,seats,chem,r,studentMeta={},settings={}) {
   if(!students.length||!seats.length) return {};
-  const sh=[...students].sort(()=>Math.random()-.5);
-  let cur=Object.fromEntries(seats.map((s,i)=>[s.id,i<sh.length?sh[i]:null]));
+  const sh=shuffle(students);
+  const ids=shuffle(seats.map(s=>s.id));
+  let cur=Object.fromEntries(ids.map((id,i)=>[id,i<sh.length?sh[i]:null]));
   let score=scoreFn(cur,seats,chem,r,studentMeta,settings);
-  let T=SA_TEMP; const ids=seats.map(s=>s.id);
+  let T=SA_TEMP;
   for(let i=0;i<SA_ITERS;i++){
     const a=(Math.random()*ids.length)|0,b=(Math.random()*ids.length)|0; if(a===b) continue;
     const nxt={...cur,[ids[a]]:cur[ids[b]],[ids[b]]:cur[ids[a]]};
@@ -603,15 +639,27 @@ const GBtn  = ({onClick,children,style={}}) => {
     {children}
   </button>;
 };
-function UpdateAvailableBanner() {
+function UpdateAvailableBanner({updateInfo}) {
   const T=useT();
+  const version=updateInfo?.version||updateInfo?.appVersion;
+  const changes=Array.isArray(updateInfo?.changes)?updateInfo.changes:[];
   return (
     <div style={{position:"fixed",right:18,bottom:18,zIndex:2000,background:T.panel,
       border:`1px solid ${T.accent}`,borderRadius:10,boxShadow:"0 10px 30px rgba(0,0,0,.25)",
-      padding:"14px 16px",display:"flex",gap:14,alignItems:"center",flexWrap:"wrap",maxWidth:360}}>
-      <div>
-        <div style={{fontSize:14,fontWeight:700,color:T.dark}}>Update Available: Refresh to update</div>
-        <div style={{fontSize:12,color:T.muted}}>A newer SeatCraft version has been published.</div>
+      padding:"14px 16px",display:"flex",gap:14,alignItems:"flex-start",flexWrap:"wrap",maxWidth:420}}>
+      <div style={{flex:"1 1 250px"}}>
+        <div style={{fontSize:14,fontWeight:700,color:T.dark}}>
+          Update Available{version?`: ${version}`:""}
+        </div>
+        {changes.length?(
+          <div style={{marginTop:7,display:"flex",flexDirection:"column",gap:4}}>
+            {changes.slice(0,5).map((change,i)=>(
+              <div key={i} style={{fontSize:12,color:T.muted,lineHeight:1.35}}>{change}</div>
+            ))}
+          </div>
+        ):(
+          <div style={{fontSize:12,color:T.muted}}>A newer SeatCraft version has been published.</div>
+        )}
       </div>
       <ABtn onClick={()=>window.location.reload()} style={{padding:"8px 14px"}}>Refresh</ABtn>
     </div>
@@ -797,7 +845,7 @@ export default function App() {
   const [showTut,setShowTut]     = useState(false);
   const [addingCls,setAddingCls] = useState(false);
   const [newCls,setNewCls]       = useState("");
-  const [updateAvailable,setUpdateAvailable] = useState(false);
+  const [updateInfo,setUpdateInfo] = useState(null);
   const clsRef = useRef();
   const versionRef = useRef(null);
   const borderDarkness = active ? classes[active]?.settings?.borderDarkness ?? 0 : 0;
@@ -816,7 +864,7 @@ export default function App() {
         if(!r.ok)return;
         const data=await r.json();
         if(!data?.buildId)return;
-        if(versionRef.current&&versionRef.current!==data.buildId&&!stopped)setUpdateAvailable(true);
+        if(versionRef.current&&versionRef.current!==data.buildId&&!stopped)setUpdateInfo(data);
         versionRef.current=data.buildId;
       }catch{}
     };
@@ -891,7 +939,7 @@ export default function App() {
   return (
     <ThemeCtx.Provider value={T}>
       <style>{mkStyles(T)}</style>
-      {updateAvailable&&<UpdateAvailableBanner/>}
+      {updateInfo&&<UpdateAvailableBanner updateInfo={updateInfo}/>}
       {showTut&&<TutorialModal onDone={dismissTut}/>}
       <div className="app-shell">
         {/* Sidebar */}
@@ -2382,14 +2430,20 @@ function RandomizeTab({cls,upd}) {
   const [presentColors,setPresentColors]=useState(true);
 
   const layout=lid?cls.layouts[lid]:null;
-  const seats=layout?.seats||[];
+  const seats=seatsInsideRoom(layout);
   const seatSlots=expandSeatSlots(seats);
   const totalCapacity=seats.reduce((sum,seat)=>sum+seatCapacity(seat),0);
+  const hiddenSeatCount=(layout?.seats?.length??0)-seats.length;
+  const randomLayout=layout?{...layout,seats}:null;
   const {students,chemistry,studentMeta={},settings={}}=cls;
   const radius=settings.proximityRadius??120;
   const allGrades=[...new Set(Object.values(studentMeta).map(m=>m?.grade).filter(Boolean))].sort();
   const validLocked=new Set([...locked].filter(stu=>students.includes(stu)));
   const setSetting=(f,v)=>upd(c=>({...c,settings:{...(c.settings??{}),[f]:v}}));
+  const savedRandomizations=cls.savedRandomizations??{};
+  const savedCharts=Object.values(savedRandomizations)
+    .filter(chart=>chart.layoutId===lid)
+    .sort((a,b)=>(b.savedAt??0)-(a.savedAt??0));
   const mentalCapacityCount=students.filter(stu=>mentalCapacityValue(studentMeta[stu])!==null).length;
   const frequencyRows=Object.entries(cls.sitTogether??{})
     .map(([key,count])=>({key,count,names:key.split("|||")}))
@@ -2406,6 +2460,23 @@ function RandomizeTab({cls,upd}) {
       if(together.length) upd(c=>({...c,sitTogether:addSitTogetherCounts(c.sitTogether,together)}));
       setRunning(false);
     },20);
+  };
+  const saveCurrentChart=()=>{
+    if(!layout||!result)return;
+    const name=window.prompt("Save this randomized seating chart as:", `${layout.name} chart`);
+    const clean=name?.trim();
+    if(!clean)return;
+    const saved=mkSavedRandomization({name:clean,layout,result,locked:validLocked});
+    upd(c=>({...c,savedRandomizations:{...(c.savedRandomizations??{}),[saved.id]:saved}}));
+  };
+  const loadSavedChart=id=>{
+    const saved=savedRandomizations[id];if(!saved)return;
+    setResult(cloneResult(saved.result));
+    setLocked(new Set((saved.locked??[]).filter(stu=>students.includes(stu))));
+    setSwapping(null);
+  };
+  const deleteSavedChart=id=>{
+    upd(c=>{const next={...(c.savedRandomizations??{})};delete next[id];return {...c,savedRandomizations:next};});
   };
   const lockDesk=sid=>{
     if(!result)return;
@@ -2482,8 +2553,8 @@ function RandomizeTab({cls,upd}) {
 
   return (
     <div>
-      {presenting&&layout&&result&&(
-        <PresenterView cls={cls} layout={layout} result={result} studentMeta={studentMeta}
+      {presenting&&randomLayout&&result&&(
+        <PresenterView cls={cls} layout={randomLayout} result={result} studentMeta={studentMeta}
           allGrades={allGrades} locked={validLocked} showStudentColors={presentColors}
           setShowStudentColors={setPresentColors} onClose={closePresenter}/>
       )}
@@ -2498,9 +2569,18 @@ function RandomizeTab({cls,upd}) {
         </div>
         <div>
           <div style={{fontSize:9,letterSpacing:2,marginBottom:7,color:T.muted}}>PROXIMITY · {radius}px</div>
-          <div style={{fontSize:11,color:T.muted}}>Capacity {totalCapacity} seat{totalCapacity!==1?"s":""} · adjust in Layout</div>
+          <div style={{fontSize:11,color:T.muted}}>
+            Capacity {totalCapacity} seat{totalCapacity!==1?"s":""} · {students.length} student{students.length!==1?"s":""}
+          </div>
         </div>
       </div>
+
+      {hiddenSeatCount>0&&(
+        <div style={{fontSize:11,color:T.accent,background:T.accentLt,border:`1px solid ${T.accent}30`,
+          borderRadius:7,padding:"7px 14px",marginBottom:14}}>
+          {hiddenSeatCount} desk{hiddenSeatCount!==1?"s are":" is"} outside the room boundary and excluded from Randomize.
+        </div>
+      )}
 
       <div style={{fontSize:12,color:T.dark,marginBottom:12,background:T.panel,borderRadius:7,
         border:`1px solid ${T.border}`,padding:"10px 14px",display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
@@ -2558,8 +2638,28 @@ function RandomizeTab({cls,upd}) {
           <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
             <ABtn onClick={run} disabled={!canRun}>{running?"Optimizing…":"⚡ Randomize"}</ABtn>
             {result&&<ABtn onClick={openPresenter} style={{background:T.sel}}>Present</ABtn>}
+            {result&&<GBtn onClick={saveCurrentChart}>Save chart</GBtn>}
             {result&&<GBtn onClick={()=>{setResult(null);setSwapping(null);}}>Clear</GBtn>}
             {validLocked.size>0&&<GBtn onClick={()=>setLocked(new Set())}>Unlock all</GBtn>}
+            <select defaultValue="" onChange={e=>{if(e.target.value){loadSavedChart(e.target.value);e.target.value="";}}}
+              disabled={!savedCharts.length}
+              style={{border:`1px solid ${T.border}`,borderRadius:6,padding:"8px 12px",fontSize:12,background:T.panel,
+                color:savedCharts.length?T.dark:T.muted,cursor:savedCharts.length?"pointer":"default"}}>
+              <option value="">{savedCharts.length?"Load saved chart…":"No saved charts"}</option>
+              {savedCharts.map(chart=>(
+                <option key={chart.id} value={chart.id}>
+                  {chart.name} · {new Date(chart.savedAt??Date.now()).toLocaleDateString()}
+                </option>
+              ))}
+            </select>
+            {savedCharts.length>0&&(
+              <select defaultValue="" onChange={e=>{if(e.target.value){deleteSavedChart(e.target.value);e.target.value="";}}}
+                style={{border:`1px solid ${T.border}`,borderRadius:6,padding:"8px 12px",fontSize:12,background:T.panel,
+                  color:T.muted,cursor:"pointer"}}>
+                <option value="">Delete saved…</option>
+                {savedCharts.map(chart=><option key={chart.id} value={chart.id}>{chart.name}</option>)}
+              </select>
+            )}
             <label style={{fontSize:12,color:T.muted,display:"flex",alignItems:"center",gap:6,cursor:"pointer",userSelect:"none",marginLeft:"auto"}}>
               <input type="checkbox" checked={showR} onChange={e=>setShowR(e.target.checked)}/>
               Show proximity radius on hover
