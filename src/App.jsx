@@ -174,6 +174,7 @@ const addSitTogetherCounts = (counts,pairs) => {
   pairs.forEach(k=>{next[k]=(next[k]??0)+1;});
   return next;
 };
+const hasConflict = (conflicts,a,b) => Boolean(conflicts?.[pairKey(a,b)]);
 
 // ─── desk shapes ──────────────────────────────────────────────────────────────
 // hex uses layered SVG rendering (no clip-path on the border)
@@ -265,9 +266,10 @@ const seatsInsideRoom = layout => {
 
 // ─── data factories ───────────────────────────────────────────────────────────
 const mkClass = name=>({
-  id:uid(),name,students:[],studentMeta:{},layouts:{},chemistry:{},activeLayoutId:null,sitTogether:{},
+  id:uid(),name,students:[],studentMeta:{},layouts:{},chemistry:{},conflicts:{},activeLayoutId:null,sitTogether:{},
   settings:{
     proximityRadius:120,
+    flipChemistry:false,
     separateGenders:false,
     genderWeight:5,
     mixGrades:false,
@@ -314,7 +316,7 @@ const mkSavedRandomization = ({name,layout,result,locked})=>({
 });
 
 // ─── SA optimizer ─────────────────────────────────────────────────────────────
-function scoreFn(asgn,seats,chem,r,studentMeta={},settings={}) {
+function scoreFn(asgn,seats,chem,r,studentMeta={},settings={},conflicts={}) {
   let p=0; const pairs=Object.entries(asgn).filter(([,v])=>v);
   pairs.forEach(([sid,student])=>{
     const seat=seats.find(s=>s.id===sid);
@@ -324,7 +326,9 @@ function scoreFn(asgn,seats,chem,r,studentMeta={},settings={}) {
     const[si,sa]=pairs[i],[sj,sb]=pairs[j];
     const sA=seats.find(s=>s.id===si),sB=seats.find(s=>s.id===sj);
     if(!sA||!sB||edist(sA,sB)>r) continue;
-    p+=chem[pairKey(sa,sb)]??50;
+    if(hasConflict(conflicts,sa,sb)) p+=1000000;
+    const chemValue=chem[pairKey(sa,sb)]??50;
+    p+=settings?.flipChemistry ? 100-chemValue : chemValue;
     const mA=studentMeta?.[sa]??{},mB=studentMeta?.[sb]??{};
     if(settings?.separateGenders&&mA.gender&&mB.gender&&mA.gender===mB.gender) p+=clamp(settings.genderWeight??5,0,10);
     if(settings?.mixGrades&&mA.grade&&mB.grade&&mA.grade===mB.grade) p+=clamp(settings.gradeWeight??5,0,10);
@@ -349,17 +353,17 @@ function scoreFn(asgn,seats,chem,r,studentMeta={},settings={}) {
   }
   return p;
 }
-function runSA(students,seats,chem,r,studentMeta={},settings={}) {
+function runSA(students,seats,chem,r,studentMeta={},settings={},conflicts={}) {
   if(!students.length||!seats.length) return {};
   const sh=shuffle(students);
   const ids=shuffle(seats.map(s=>s.id));
   let cur=Object.fromEntries(ids.map((id,i)=>[id,i<sh.length?sh[i]:null]));
-  let score=scoreFn(cur,seats,chem,r,studentMeta,settings);
+  let score=scoreFn(cur,seats,chem,r,studentMeta,settings,conflicts);
   let T=SA_TEMP;
   for(let i=0;i<SA_ITERS;i++){
     const a=(Math.random()*ids.length)|0,b=(Math.random()*ids.length)|0; if(a===b) continue;
     const nxt={...cur,[ids[a]]:cur[ids[b]],[ids[b]]:cur[ids[a]]};
-    const ns=scoreFn(nxt,seats,chem,r,studentMeta,settings);
+    const ns=scoreFn(nxt,seats,chem,r,studentMeta,settings,conflicts);
     if(ns<score||Math.random()<Math.exp((score-ns)/T)){cur=nxt;score=ns;}
     T*=SA_COOL;
   }
@@ -376,13 +380,13 @@ function buildLockedAssignment(result,seats,lockedStudents) {
   });
   return locked;
 }
-function runLockedSA(students,seats,currentResult,lockedStudents,chem,r,studentMeta={},settings={}) {
+function runLockedSA(students,seats,currentResult,lockedStudents,chem,r,studentMeta={},settings={},conflicts={}) {
   const lockedAssignment=buildLockedAssignment(currentResult,seats,lockedStudents);
   const lockedNames=new Set(Object.values(lockedAssignment));
   const remainingStudents=students.filter(stu=>!lockedNames.has(stu));
   const seatSlots=expandSeatSlots(seats);
   const remainingSlots=seatSlots.filter(slot=>!(slot.id in lockedAssignment));
-  const randomized=runSA(remainingStudents,remainingSlots,chem,r,studentMeta,settings);
+  const randomized=runSA(remainingStudents,remainingSlots,chem,r,studentMeta,settings,conflicts);
   return {...lockedAssignment,...randomized};
 }
 
@@ -641,28 +645,79 @@ const GBtn  = ({onClick,children,style={}}) => {
 };
 function UpdateAvailableBanner({updateInfo}) {
   const T=useT();
+  const [showDetails,setShowDetails]=useState(false);
   const version=updateInfo?.version||updateInfo?.appVersion;
   const changes=Array.isArray(updateInfo?.changes)?updateInfo.changes:[];
   return (
-    <div style={{position:"fixed",right:18,bottom:18,zIndex:2000,background:T.panel,
-      border:`1px solid ${T.accent}`,borderRadius:10,boxShadow:"0 10px 30px rgba(0,0,0,.25)",
-      padding:"14px 16px",display:"flex",gap:14,alignItems:"flex-start",flexWrap:"wrap",maxWidth:420}}>
-      <div style={{flex:"1 1 250px"}}>
-        <div style={{fontSize:14,fontWeight:700,color:T.dark}}>
-          Update Available{version?`: ${version}`:""}
-        </div>
-        {changes.length?(
-          <div style={{marginTop:7,display:"flex",flexDirection:"column",gap:4}}>
-            {changes.slice(0,5).map((change,i)=>(
-              <div key={i} style={{fontSize:12,color:T.muted,lineHeight:1.35}}>{change}</div>
-            ))}
+    <>
+      {showDetails&&(
+        <Overlay>
+          <div style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:12,padding:"24px 26px",
+            width:"min(460px, 100%)",boxShadow:"0 16px 48px rgba(0,0,0,.28)"}}>
+            <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:22,color:T.dark,marginBottom:6}}>
+              {version||"SeatCraft Update"}
+            </div>
+            <div style={{fontSize:13,color:T.muted,lineHeight:1.6,marginBottom:16}}>
+              This update adds more teacher control over chemistry rules and seating constraints.
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:20}}>
+              {changes.map((change,i)=>(
+                <div key={i} style={{fontSize:13,color:T.dark,lineHeight:1.45,border:`1px solid ${T.border}`,
+                  borderRadius:7,padding:"8px 10px",background:T.bg}}>
+                  {change}
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end",flexWrap:"wrap"}}>
+              <GBtn onClick={()=>setShowDetails(false)}>Close</GBtn>
+              <ABtn onClick={()=>window.location.reload()}>Refresh to update</ABtn>
+            </div>
           </div>
-        ):(
-          <div style={{fontSize:12,color:T.muted}}>A newer SeatCraft version has been published.</div>
-        )}
+        </Overlay>
+      )}
+      <div style={{position:"fixed",right:18,bottom:18,zIndex:2000,background:T.panel,
+        border:`1px solid ${T.accent}`,borderRadius:10,boxShadow:"0 10px 30px rgba(0,0,0,.25)",
+        padding:"14px 16px",display:"flex",gap:14,alignItems:"flex-start",flexWrap:"wrap",maxWidth:420}}>
+        <div style={{flex:"1 1 250px"}}>
+          <div style={{fontSize:14,fontWeight:700,color:T.dark}}>
+            Update Available{version?`: ${version}`:""}
+          </div>
+          {changes.length?(
+            <div style={{marginTop:7,display:"flex",flexDirection:"column",gap:4}}>
+              {changes.slice(0,5).map((change,i)=>(
+                <div key={i} style={{fontSize:12,color:T.muted,lineHeight:1.35}}>{change}</div>
+              ))}
+            </div>
+          ):(
+            <div style={{fontSize:12,color:T.muted}}>A newer SeatCraft version has been published.</div>
+          )}
+        </div>
+        <ABtn onClick={()=>setShowDetails(true)} style={{padding:"8px 14px"}}>View update</ABtn>
       </div>
-      <ABtn onClick={()=>window.location.reload()} style={{padding:"8px 14px"}}>Refresh</ABtn>
-    </div>
+    </>
+  );
+}
+
+function PrivacyNoticeModal({onClose}) {
+  const T=useT();
+  return (
+    <Overlay>
+      <div style={{background:T.panel,border:`1px solid ${T.border}`,borderRadius:12,padding:"24px 26px",
+        width:"min(500px, 100%)",boxShadow:"0 16px 48px rgba(0,0,0,.28)"}}>
+        <div style={{fontFamily:"'Poppins', 'Segoe UI', sans-serif",fontSize:22,color:T.dark,marginBottom:8}}>
+          Privacy Notice
+        </div>
+        <div style={{fontSize:13,color:T.muted,lineHeight:1.7,display:"flex",flexDirection:"column",gap:10,marginBottom:20,textAlign:"left"}}>
+          <p>SeatCraft stores account information and classroom data locally on this computer/browser.</p>
+          <p>We do not collect or upload teacher emails, passwords, student names, student metadata, chemistry scores, seating layouts, saved charts, or sit-together frequency.</p>
+          <p>Passwords are saved locally as a simple hashed value for this app's sign-in screen. Anyone with access to this browser profile may still be able to access locally stored app data.</p>
+          <p>Clearing browser/site data, switching browsers, or using a different computer can remove or hide the locally saved data.</p>
+        </div>
+        <div style={{display:"flex",justifyContent:"flex-end"}}>
+          <ABtn onClick={onClose}>Done</ABtn>
+        </div>
+      </div>
+    </Overlay>
   );
 }
 
@@ -775,6 +830,7 @@ function LoginPage({onLogin}) {
   const [pass,setPass]  = useState("");
   const [err,setErr]    = useState("");
   const [busy,setBusy]  = useState(false);
+  const [showPrivacy,setShowPrivacy] = useState(false);
 
   const submit = async () => {
     setErr(""); setBusy(true);
@@ -801,6 +857,7 @@ function LoginPage({onLogin}) {
 
   return (
     <div style={{height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:T.bg}}>
+      {showPrivacy&&<PrivacyNoticeModal onClose={()=>setShowPrivacy(false)}/>}
       <div className="login-card" style={{width:360,background:T.panel,borderRadius:16,
         border:`1px solid ${T.border}`,padding:"40px 36px",boxShadow:"0 8px 32px rgba(0,0,0,.1)"}}>
         <div style={{textAlign:"center",marginBottom:32}}>
@@ -827,6 +884,11 @@ function LoginPage({onLogin}) {
         <p style={{fontSize:11,color:T.muted,textAlign:"center",marginTop:20,lineHeight:1.6}}>
           {mode==="register"?"Data saved privately under your email.":"Session stored locally in this browser."}
         </p>
+        <button onClick={()=>setShowPrivacy(true)}
+          style={{display:"block",margin:"10px auto 0",background:"none",border:"none",
+            color:T.accent,fontSize:11,textDecoration:"underline",cursor:"pointer"}}>
+          Privacy Notice
+        </button>
       </div>
     </div>
   );
@@ -846,6 +908,7 @@ export default function App() {
   const [addingCls,setAddingCls] = useState(false);
   const [newCls,setNewCls]       = useState("");
   const [updateInfo,setUpdateInfo] = useState(null);
+  const [showPrivacy,setShowPrivacy] = useState(false);
   const clsRef = useRef();
   const versionRef = useRef(null);
   const borderDarkness = active ? classes[active]?.settings?.borderDarkness ?? 0 : 0;
@@ -941,6 +1004,7 @@ export default function App() {
       <style>{mkStyles(T)}</style>
       {updateInfo&&<UpdateAvailableBanner updateInfo={updateInfo}/>}
       {showTut&&<TutorialModal onDone={dismissTut}/>}
+      {showPrivacy&&<PrivacyNoticeModal onClose={()=>setShowPrivacy(false)}/>}
       <div className="app-shell">
         {/* Sidebar */}
         <aside className="app-sidebar">
@@ -993,6 +1057,11 @@ export default function App() {
               style={{flex:1,background:"none",border:`1px solid ${T.sidebarSubtle}`,
                 color:T.sidebarMuted,borderRadius:6,padding:"6px 0",fontSize:10}}>Out</button>
           </div>
+          <button onClick={()=>setShowPrivacy(true)}
+            style={{marginTop:8,background:"none",border:"none",color:T.sidebarMuted,
+              fontSize:10,textDecoration:"underline",cursor:"pointer",alignSelf:"center"}}>
+            Privacy Notice
+          </button>
         </aside>
         <main className="app-main">
           {!cls?<EmptyState onAdd={()=>setAddingCls(true)}/>
@@ -2114,7 +2183,7 @@ function StudentsTab({cls,upd}) {
 // ─── chemistry radial graph ───────────────────────────────────────────────────
 function ChemistryTab({cls,upd}) {
   const T=useT();
-  const {students,chemistry}=cls;
+  const {students,chemistry,conflicts={}}=cls;
   const [sel,setSel]=useState(null);
   const [editing,setEditing]=useState(null); // {a,b,x,y}
   const [directA,setDirectA]=useState("");
@@ -2124,6 +2193,14 @@ function ChemistryTab({cls,upd}) {
 
   const setChem=(a,b,v)=>upd(c=>({...c,chemistry:{...c.chemistry,[pairKey(a,b)]:v}}));
   const getV=(a,b)=>chemistry[pairKey(a,b)]??50;
+  const setConflict=(a,b,on)=>upd(c=>{
+    const key=pairKey(a,b);
+    const next={...(c.conflicts??{})};
+    if(on) next[key]=true;
+    else delete next[key];
+    return {...c,conflicts:next};
+  });
+  const getConflict=(a,b)=>hasConflict(conflicts,a,b);
 
   const W=660,H=540,cx=W/2,cy=H/2;
   const others=sel?students.filter(s=>s!==sel):[];
@@ -2139,6 +2216,9 @@ function ChemistryTab({cls,upd}) {
   const lowCount=pairValues.filter(p=>p.v<=25).length;
   const midCount=pairValues.filter(p=>p.v>25&&p.v<=50).length;
   const highCount=pairValues.filter(p=>p.v>75).length;
+  const conflictCount=Object.entries(conflicts)
+    .filter(([key,on])=>on&&key.split("|||").every(name=>students.includes(name)))
+    .length;
 
   return (
     <div className="chemistry-shell">
@@ -2159,6 +2239,7 @@ function ChemistryTab({cls,upd}) {
           </select>
           {directA&&directB&&directA!==directB&&(()=>{
             const v=getV(directA,directB),col=chemCol(v);
+            const conflict=getConflict(directA,directB);
             return (
               <>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,color:T.muted}}>
@@ -2168,6 +2249,10 @@ function ChemistryTab({cls,upd}) {
                 <RangeInput min={0} max={100} step={5} value={v}
                   onChange={next=>setChem(directA,directB,next)}
                   style={{width:"100%",accentColor:col}}/>
+                <label style={{display:"flex",alignItems:"center",gap:7,marginTop:7,fontSize:12,color:conflict?T.accent:T.dark,cursor:"pointer",userSelect:"none"}}>
+                  <input type="checkbox" checked={conflict} onChange={e=>setConflict(directA,directB,e.target.checked)}/>
+                  Conflict
+                </label>
               </>
             );
           })()}
@@ -2255,8 +2340,9 @@ function ChemistryTab({cls,upd}) {
             {/* Editing popup — appears near the clicked line midpoint */}
             {editing&&(()=>{
               const v=getV(editing.a,editing.b),col=chemCol(v);
+              const conflict=getConflict(editing.a,editing.b);
               // Compute popup position relative to SVG container
-              const px=Math.min(editing.x,W-170),py=Math.min(editing.y+10,H-120);
+              const px=Math.min(editing.x,W-170),py=Math.min(editing.y+10,H-150);
               return (
                 <div style={{position:"absolute",left:px,top:py,width:165,background:T.panel,
                   border:`1px solid ${T.border}`,borderRadius:9,padding:12,
@@ -2271,6 +2357,10 @@ function ChemistryTab({cls,upd}) {
                   <RangeInput min={0} max={100} step={5} value={v}
                     onChange={next=>setChem(editing.a,editing.b,next)}
                     style={{width:"100%",accentColor:col}}/>
+                  <label style={{display:"flex",alignItems:"center",gap:7,marginTop:7,fontSize:12,color:conflict?T.accent:T.dark,cursor:"pointer",userSelect:"none"}}>
+                    <input type="checkbox" checked={conflict} onChange={e=>setConflict(editing.a,editing.b,e.target.checked)}/>
+                    Conflict
+                  </label>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:T.muted,marginTop:2}}>
                     <span style={{color:"#E53E3E"}}>0</span>
                     <span style={{color:"#C8C820"}}>50</span>
@@ -2287,11 +2377,12 @@ function ChemistryTab({cls,upd}) {
       </div>
       <div className="insight-panel">
         <div style={{fontSize:9,letterSpacing:2,color:T.muted,marginBottom:12}}>CHEMISTRY OVERVIEW</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:8,marginBottom:16}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:8,marginBottom:16}}>
           {[
             ["AVG",avg,T.accent],
             ["LOW",lowCount,"#E53E3E"],
             ["HIGH",highCount,"#3AA840"],
+            ["CONFLICT",conflictCount,T.accent],
           ].map(([label,value,color])=>(
             <div key={label} style={{border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 8px",textAlign:"center"}}>
               <div style={{fontSize:9,letterSpacing:1.4,color:T.muted,marginBottom:4}}>{label}</div>
@@ -2435,7 +2526,7 @@ function RandomizeTab({cls,upd}) {
   const totalCapacity=seats.reduce((sum,seat)=>sum+seatCapacity(seat),0);
   const hiddenSeatCount=(layout?.seats?.length??0)-seats.length;
   const randomLayout=layout?{...layout,seats}:null;
-  const {students,chemistry,studentMeta={},settings={}}=cls;
+  const {students,chemistry,conflicts={},studentMeta={},settings={}}=cls;
   const radius=settings.proximityRadius??120;
   const allGrades=[...new Set(Object.values(studentMeta).map(m=>m?.grade).filter(Boolean))].sort();
   const validLocked=new Set([...locked].filter(stu=>students.includes(stu)));
@@ -2453,7 +2544,7 @@ function RandomizeTab({cls,upd}) {
   const run=()=>{
     if(!layout||!students.length)return;setRunning(true);setSwapping(null);
     setTimeout(()=>{
-      const slotResult=runLockedSA(students,seats,result,validLocked,chemistry,radius,studentMeta,settings);
+      const slotResult=runLockedSA(students,seats,result,validLocked,chemistry,radius,studentMeta,settings,conflicts);
       const nextResult=collapseSlotAssignments(slotResult);
       setResult(nextResult);
       const together=seatedTogetherPairs(nextResult,seats,radius);
@@ -2546,9 +2637,11 @@ function RandomizeTab({cls,upd}) {
   const canRun=layout&&students.length>0&&seatSlots.length>0&&!running;
   const chartScale=1.18;
   const active=[
+    settings.flipChemistry&&"Chemistry flipped",
     settings.separateGenders&&`Gender (w=${clamp(settings.genderWeight??5,0,10)})`,
     settings.mixGrades&&`Grade mix (w=${clamp(settings.gradeWeight??5,0,10)})`,
     settings.mixMentalCapacity&&`Focus Level ${settings.mentalMixMode==="homogeneous"?"homogeneous":"heterogeneous"} (w=${settings.mentalCapacityWeight})`,
+    Object.values(conflicts).some(Boolean)&&`${Object.values(conflicts).filter(Boolean).length} conflict pair${Object.values(conflicts).filter(Boolean).length!==1?"s":""}`,
   ].filter(Boolean);
 
   return (
@@ -2835,6 +2928,7 @@ function SettingsTab({cls,upd}) {
   const Sec=({t})=><div style={{fontSize:10,letterSpacing:2,color:T.muted,marginTop:24,marginBottom:2,fontWeight:700}}>{t}</div>;
   const activeRules=[
     ["Neighbor radius",`${radius}px`],
+    ["Chemistry meaning",s.flipChemistry?"Flipped":"Original"],
     ["Even groups",s.evenGroups?"On":"Off"],
     ["Gender separation",s.separateGenders?`On · ${clamp(s.genderWeight??5,0,10)}`:"Off"],
     ["Grade mixing",s.mixGrades?`On · ${clamp(s.gradeWeight??5,0,10)}`:"Off"],
@@ -2852,6 +2946,10 @@ function SettingsTab({cls,upd}) {
         </Row>
         <Row label="Make groups even" desc="Balances occupied neighbor groups, where a group is desks inside the neighbor radius plus their connected mutuals.">
           <Toggle f="evenGroups" label="Balance neighbor groups"/>
+        </Row>
+        <Sec t="CHEMISTRY"/>
+        <Row label="Flip chemistry" desc="Original keeps high-chemistry pairs farther apart and seats low-chemistry pairs closer. Flipped seats high-chemistry pairs closer and keeps low-chemistry pairs farther apart.">
+          <Toggle f="flipChemistry" label="Flip chemistry meaning"/>
         </Row>
         <Sec t="GENDER"/>
         <Row label="Separate genders" desc="Penalizes same-gender neighbors. Requires gender data in Students tab.">
@@ -2895,7 +2993,7 @@ function SettingsTab({cls,upd}) {
           ))}
         </div>
         <div style={{background:T.tipBg,border:`1px solid ${T.tipBorder}`,borderRadius:8,padding:"14px 16px",fontSize:12,color:T.tipText,lineHeight:1.8}}>
-          <strong>Tip:</strong> Chemistry now starts at 50, and lower-scored pairs are preferred as neighbors for relationship-building. Run Randomize several times — SA is stochastic.
+          <strong>Tip:</strong> Chemistry starts at 50. Original mode prefers lower-scored pairs as neighbors for relationship-building; flipped mode prefers higher-scored pairs as neighbors.
         </div>
       </div>
     </div>

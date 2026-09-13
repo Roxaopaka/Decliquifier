@@ -1,12 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 
-const version = "Update 1.1";
+const version = "Update 1.2";
 const changes = [
-  "Changed update notices to list the specific release changes.",
-  "Added saved randomized seating charts in the Randomize tab.",
-  "Fixed Randomize capacity so it matches the visible layout preview.",
-  "Fixed hidden/out-of-room desks taking student assignments.",
-  "Changed extra-seat randomization so open seats rotate across repeated runs.",
+  "Added conflict pairs in Chemistry so selected students can be kept apart.",
+  "Added Flip chemistry in Settings to reverse how chemistry scores guide seating.",
+  "Changed the update notification to open a version 1.2 details pop-up.",
+  "Added privacy notices on the login screen and signed-in sidebar.",
+  "Kept existing student metadata, chemistry, sit-together frequency, layouts, and teacher settings intact.",
 ];
 const buildId = process.env.COMMIT_REF || process.env.DEPLOY_ID || String(Date.now());
 const payload = {
